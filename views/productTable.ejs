@@ -1,0 +1,20 @@
+<table>
+  <thead>
+    <tr><th>ID</th><th>Product name</th><th>Category</th><th>Price (RM)</th><th>Stock</th><% if (showActions) { %><th>Action</th><% } %></tr>
+  </thead>
+  <tbody>
+    <% items.forEach((product) => { %>
+      <tr>
+        <td><%= product.productId %></td>
+        <td><%= product.productName %></td>
+        <td><%= product.category %></td>
+        <td><%= product.price.toFixed(2) %></td>
+        <td><%= product.stockQuantity %></td>
+        <% if (showActions) { %>
+          <td><a class="button" href="/products/<%= product.productId %>/edit">Edit</a>
+              <a class="button danger" href="/products/<%= product.productId %>/delete">Delete</a></td>
+        <% } %>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>

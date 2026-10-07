@@ -1,0 +1,12 @@
+<%- include('header') %>
+<h1><%= title %></h1>
+<% if (error) { %><p class="message error"><%= error %></p><% } %>
+<form method="post" action="<%= action %>">
+  <label>Name <input name="name" value="<%= formData.name || '' %>" required></label>
+  <label>Email <input type="email" name="email" value="<%= formData.email || '' %>" required></label>
+  <label>Phone <input name="phone" value="<%= formData.phone || '' %>" required></label>
+  <label>Address <input name="address" value="<%= formData.address || '' %>" required></label>
+  <button>Save</button>
+  <a class="button gray" href="/customers">Cancel</a>
+</form>
+<%- include('footer') %>
