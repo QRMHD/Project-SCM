@@ -1,0 +1,20 @@
+<table>
+  <thead>
+    <tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Address</th><% if (showActions) { %><th>Action</th><% } %></tr>
+  </thead>
+  <tbody>
+    <% items.forEach((customer) => { %>
+      <tr>
+        <td><%= customer.customerId %></td>
+        <td><%= customer.name %></td>
+        <td><%= customer.email %></td>
+        <td><%= customer.phone %></td>
+        <td><%= customer.address %></td>
+        <% if (showActions) { %>
+          <td><a class="button" href="/customers/<%= customer.customerId %>/edit">Edit</a>
+              <a class="button danger" href="/customers/<%= customer.customerId %>/delete">Delete</a></td>
+        <% } %>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>

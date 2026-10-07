@@ -1,0 +1,12 @@
+<%- include('header') %>
+<h1><%= title %></h1>
+<% if (error) { %><p class="message error"><%= error %></p><% } %>
+<form method="post" action="<%= action %>">
+  <label>Product name <input name="productName" value="<%= formData.productName || '' %>" required></label>
+  <label>Category <input name="category" value="<%= formData.category || '' %>" required></label>
+  <label>Price (RM) <input type="number" name="price" step="0.01" value="<%= formData.price || '' %>" required></label>
+  <label>Stock quantity <input type="number" name="stockQuantity" value="<%= formData.stockQuantity ?? '' %>" required></label>
+  <button>Save</button>
+  <a class="button gray" href="/products">Cancel</a>
+</form>
+<%- include('footer') %>

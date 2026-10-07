@@ -1,0 +1,31 @@
+<%- include('header') %>
+<h1>Customers</h1>
+<% if (message) { %><p class="message"><%= message %></p><% } %>
+
+<form class="row" method="get" action="/customers">
+  <input name="keyword" placeholder="Search by name or email" value="<%= keyword %>">
+  <button>Search</button>
+  <a class="button" href="/customers/new">Add customer</a>
+</form>
+
+<% if (results !== null) { %>
+  <h2>Search results for "<%= keyword %>"</h2>
+  <% if (results.length === 0) { %>
+    <p class="message error">Customer not found. Try another keyword.</p>
+  <% } else { %>
+    <%- include('customerTable', { items: results, showActions: true }) %>
+  <% } %>
+<% } %>
+
+<% if (highlight) { %>
+  <h2>Updated customer</h2>
+  <%- include('customerTable', { items: [highlight], showActions: false }) %>
+<% } %>
+
+<h2>All customers (<%= customers.length %>)</h2>
+<% if (customers.length === 0) { %>
+  <p>No customers yet.</p>
+<% } else { %>
+  <%- include('customerTable', { items: customers, showActions: false }) %>
+<% } %>
+<%- include('footer') %>

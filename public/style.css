@@ -1,0 +1,17 @@
+body { margin: 0; font-family: Arial, sans-serif; background: #f4f7f6; color: #222; }
+header { display: flex; justify-content: space-between; padding: 12px 20px; background: #0e6b58; }
+header a { color: #fff; text-decoration: none; margin-left: 16px; }
+.brand { font-weight: bold; font-size: 1.2rem; margin-left: 0; }
+main { max-width: 900px; margin: 0 auto; padding: 20px; }
+label { display: block; margin-bottom: 10px; }
+input { padding: 8px; margin-top: 4px; width: 100%; box-sizing: border-box; }
+button, .button { display: inline-block; padding: 8px 14px; background: #f2b705; color: #222; border: 0; border-radius: 4px; cursor: pointer; text-decoration: none; font-size: 0.95rem; }
+.button.danger, button.danger { background: #b3261e; color: #fff; }
+.button.gray { background: #ccd6d3; }
+.row { display: flex; gap: 8px; margin-bottom: 14px; align-items: center; }
+.row input { margin-top: 0; }
+table { width: 100%; border-collapse: collapse; background: #fff; margin-bottom: 20px; }
+th, td { padding: 8px 10px; border-bottom: 1px solid #dde5e2; text-align: left; }
+th { background: #e6eeeb; }
+.message { padding: 10px; background: #e3f4ec; border-left: 4px solid #0e6b58; }
+.message.error { background: #fbe9e7; border-left-color: #b3261e; }

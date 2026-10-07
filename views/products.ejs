@@ -1,0 +1,31 @@
+<%- include('header') %>
+<h1>Products</h1>
+<% if (message) { %><p class="message"><%= message %></p><% } %>
+
+<form class="row" method="get" action="/products">
+  <input name="keyword" placeholder="Search by product name or category" value="<%= keyword %>">
+  <button>Search</button>
+  <a class="button" href="/products/new">Add product</a>
+</form>
+
+<% if (results !== null) { %>
+  <h2>Search results for "<%= keyword %>"</h2>
+  <% if (results.length === 0) { %>
+    <p class="message error">Product not found. Try another keyword.</p>
+  <% } else { %>
+    <%- include('productTable', { items: results, showActions: true }) %>
+  <% } %>
+<% } %>
+
+<% if (highlight) { %>
+  <h2>Updated product</h2>
+  <%- include('productTable', { items: [highlight], showActions: false }) %>
+<% } %>
+
+<h2>All products (<%= products.length %>)</h2>
+<% if (products.length === 0) { %>
+  <p>No products yet.</p>
+<% } else { %>
+  <%- include('productTable', { items: products, showActions: false }) %>
+<% } %>
+<%- include('footer') %>
