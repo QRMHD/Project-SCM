@@ -1,0 +1,4 @@
+node_modules/
+data/olms.json
+data/*.tmp
+*.log

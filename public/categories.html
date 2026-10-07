@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OLMS | Categories</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script type="module" src="/js/categories.js"></script>
+</head>
+<body>
+    <header><div class="headerInner"><a class="brand" href="/">OL<span>MS</span></a><span>Online Local Mart System</span><span class="badge">Labs 3 &amp; 4</span></div></header>
+    <nav aria-label="Modules"><a href="/products.html">Products</a><a href="/categories.html" class="active" aria-current="page">Categories</a><a href="/customers.html">Customers</a><a href="/sellers.html">Sellers</a></nav>
+    <main>
+        <div class="intro"><div><p class="eyebrow">CATEGORY MODULE</p><h1>Category management</h1><p>Organise products into clear shopping categories.</p></div><div class="counter"><strong id="recordCount">0</strong><span>records</span></div></div>
+        <p class="scope">Local lab application · Four CRUD modules · No login or role protection in this version.</p>
+        <p class="note">A category cannot be deleted while a product still uses it.</p>
+        <div id="message" class="message" role="status" aria-live="polite">Loading records...</div>
+        <div class="workspace">
+            <section class="panel"><p class="eyebrow">01 / ENTER DETAILS</p><h2 id="formTitle">Create category</h2>
+                <form id="recordForm" novalidate><div class="formFields"><div class="field"><label for="categoryId">Category ID</label><input id="categoryId" type="number" min="1" step="1"></div><div class="field"><label for="categoryName">Category name</label><input id="categoryName" type="text" maxlength="80"></div></div><p id="formHint" class="hint">Use a unique ID. Complete all fields.</p><div class="actions"><button id="saveButton" type="submit">Create category</button><button id="cancelButton" class="secondary" type="button">Clear form</button></div></form>
+            </section>
+            <section class="panel"><p class="eyebrow">02 / FIND A RECORD</p><h2>Search, edit or delete</h2><p class="hint">Search first, then choose an action on the matching record.</p>
+                <form id="searchForm" novalidate><div class="searchFields"><div><label for="searchBy">Search by</label><select id="searchBy"><option value="categoryId">Category ID (exact)</option><option value="categoryName">Category name (contains)</option></select></div><div><label for="searchValue">Search value</label><input id="searchValue" maxlength="120" placeholder="Enter a search value"></div></div><div class="actions"><button type="submit">Search</button><button id="clearSearch" class="secondary" type="button">Clear search</button></div></form>
+                <div id="searchResults" class="results" aria-live="polite">Search results will appear here.</div>
+            </section>
+        </div>
+        <section class="panel inventory"><div class="tableTitle"><div><p class="eyebrow">03 / COMPLETE RECORDS</p><h2>All categories</h2></div><button id="refreshButton" class="secondary" type="button">Refresh all</button></div><div class="tableScroll"><table><thead><tr><th scope="col">Category ID</th><th scope="col">Category name</th></tr></thead><tbody id="recordTable"></tbody></table></div><p id="tableSummary" class="hint"></p></section>
+        <footer>CSEB5223 · Section 01B · Group 5 · ES6 + Express</footer>
+    </main>
+    <dialog id="deleteDialog" aria-labelledby="deleteTitle"><h2 id="deleteTitle">Delete this category?</h2><p>Check the details before confirming. This action cannot be undone.</p><dl id="deleteDetails"></dl><div class="actions"><button id="confirmDelete" class="danger" type="button">Confirm deletion</button><button id="cancelDelete" class="secondary" type="button">Cancel</button></div></dialog>
+</body>
+</html>
