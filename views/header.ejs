@@ -8,10 +8,9 @@
 </head>
 <body>
 <header>
-  <a class="brand" href="/products">Local Mart</a>
+  <a class="brand" href="/">Local Mart</a>
   <nav>
-    <a href="/products">Products</a>
-    <a href="/customers">Customers</a>
+    <% modules.forEach((m) => { %><a href="<%= m.path %>"><%= m.title %></a><% }) %>
   </nav>
 </header>
 <main>

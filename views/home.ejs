@@ -1,0 +1,13 @@
+<%- include('header') %>
+<h1>Online Local Mart System</h1>
+<p>Manage the whole mart from one place. Each module has Create, Search, Edit, Delete and Display.</p>
+<div class="cards">
+  <% modules.forEach((m) => { %>
+    <a class="module" href="<%= m.path %>">
+      <strong><%= m.title %></strong>
+      <span class="count"><%= m.manager.getAll().length %></span>
+      <span><%= m.description %></span>
+    </a>
+  <% }) %>
+</div>
+<%- include('footer') %>

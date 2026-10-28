@@ -1,0 +1,22 @@
+<%- include('header') %>
+<h1><%= title %></h1>
+<% if (error) { %><p class="message error"><%= error %></p><% } %>
+<form method="post" action="<%= action %>">
+  <% fields.forEach((field) => { %>
+    <label><%= field.label %>
+      <% if (field.type === 'select') { %>
+        <select name="<%= field.name %>">
+          <% field.options.forEach((option) => { %>
+            <option value="<%= option.value %>" <%= String(formData[field.name]) === String(option.value) ? 'selected' : '' %>><%= option.label %></option>
+          <% }) %>
+        </select>
+      <% } else { %>
+        <input type="<%= field.type %>" name="<%= field.name %>" step="<%= field.step || 'any' %>" value="<%= formData[field.name] ?? '' %>" required>
+      <% } %>
+    </label>
+    <% if (field.hint) { %><p class="hint"><%= field.hint %></p><% } %>
+  <% }) %>
+  <button>Save</button>
+  <a class="button gray" href="<%= config.path %>">Cancel</a>
+</form>
+<%- include('footer') %>
