@@ -1,0 +1,31 @@
+<%- include('header') %>
+<h1><%= config.title %></h1>
+<% if (message) { %><p class="message <%= isError ? 'error' : '' %>"><%= message %></p><% } %>
+
+<form class="row" method="get" action="<%= config.path %>">
+  <input name="keyword" placeholder="<%= config.searchHint %>" value="<%= keyword %>">
+  <button>Search</button>
+  <a class="button" href="<%= config.path %>/new">Add <%= config.singular %></a>
+</form>
+
+<% if (results !== null) { %>
+  <h2>Search results for "<%= keyword %>"</h2>
+  <% if (results.length === 0) { %>
+    <p class="message error">No <%= config.singular %> found. Try another keyword.</p>
+  <% } else { %>
+    <%- include('table', { rows: results, showActions: true }) %>
+  <% } %>
+<% } %>
+
+<% if (highlight) { %>
+  <h2>Updated <%= config.singular %></h2>
+  <%- include('table', { rows: [highlight], showActions: false }) %>
+<% } %>
+
+<h2>All <%= config.title.toLowerCase() %> (<%= items.length %>)</h2>
+<% if (items.length === 0) { %>
+  <p>No data yet.</p>
+<% } else { %>
+  <%- include('table', { rows: items, showActions: false }) %>
+<% } %>
+<%- include('footer') %>

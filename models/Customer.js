@@ -1,4 +1,5 @@
-// Customer object: attributes with data types, getters and setters
+import { Validator } from '../utils/Validator.js';
+
 export class Customer {
   constructor(customerId, name, email, phone, address) {
     this.customerId = customerId;
@@ -9,34 +10,17 @@ export class Customer {
   }
 
   get customerId() { return this._customerId; }
-  set customerId(customerId) {
-    if (!Number.isInteger(customerId)) throw new Error('Customer ID must be a whole number.');
-    this._customerId = customerId;
-  }
+  set customerId(customerId) { this._customerId = Validator.integer(customerId, 'Customer ID', 1); }
 
   get name() { return this._name; }
-  set name(name) {
-    if (typeof name !== 'string' || name.trim() === '') throw new Error('Name is required.');
-    this._name = name.trim();
-  }
+  set name(name) { this._name = Validator.text(name, 'Name'); }
 
   get email() { return this._email; }
-  set email(email) {
-    if (typeof email !== 'string' || !email.includes('@')) throw new Error('Enter a valid email.');
-    this._email = email.trim();
-  }
+  set email(email) { this._email = Validator.email(email); }
 
   get phone() { return this._phone; }
-  set phone(phone) {
-    if (typeof phone !== 'string' || !/^[0-9+\- ]{7,15}$/.test(phone.trim())) {
-      throw new Error('Phone must have 7 to 15 digits.');
-    }
-    this._phone = phone.trim();
-  }
+  set phone(phone) { this._phone = Validator.phone(phone); }
 
   get address() { return this._address; }
-  set address(address) {
-    if (typeof address !== 'string' || address.trim() === '') throw new Error('Address is required.');
-    this._address = address.trim();
-  }
+  set address(address) { this._address = Validator.text(address, 'Address'); }
 }
