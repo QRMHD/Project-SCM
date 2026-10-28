@@ -1,22 +1,6 @@
-<%- include('header') %>
-<h1><%= title %></h1>
-<% if (error) { %><p class="message error"><%= error %></p><% } %>
-<form method="post" action="<%= action %>">
-  <% fields.forEach((field) => { %>
-    <label><%= field.label %>
-      <% if (field.type === 'select') { %>
-        <select name="<%= field.name %>">
-          <% field.options.forEach((option) => { %>
-            <option value="<%= option.value %>" <%= String(formData[field.name]) === String(option.value) ? 'selected' : '' %>><%= option.label %></option>
-          <% }) %>
-        </select>
-      <% } else { %>
-        <input type="<%= field.type %>" name="<%= field.name %>" step="<%= field.step || 'any' %>" value="<%= formData[field.name] ?? '' %>" required>
-      <% } %>
-    </label>
-    <% if (field.hint) { %><p class="hint"><%= field.hint %></p><% } %>
-  <% }) %>
-  <button>Save</button>
-  <a class="button gray" href="<%= config.path %>">Cancel</a>
-</form>
-<%- include('footer') %>
+<%- include('header') %><h1><%= id ? 'Edit' : 'Add' %> <%= config.single.toLowerCase() %></h1><% if (id) { %><p>ID: <%= id %> (fixed)</p><% } %>
+<form method="post" action="/<%= key %><%= id ? '/' + id + '/edit' : '' %>">
+<% config.fields.forEach(f => { %><label><%= f.label %>
+<% if (f.type === 'select') { %><select name="<%= f.name %>" required><% options[f.name].forEach(o => { %><option value="<%= o.value %>" <%= String(formData[f.name]) === String(o.value) ? 'selected' : '' %>><%= o.label %></option><% }); %></select>
+<% } else { %><input name="<%= f.name %>" type="<%= f.type %>" value="<%= f.type === 'password' ? '' : (formData[f.name] === undefined ? '' : formData[f.name]) %>" <%= f.type === 'password' && id ? '' : 'required' %> <% if (f.type === 'number') { %>min="<%= f.name === 'price' ? '0.01' : '0' %>" step="<%= f.name === 'price' ? '0.01' : '1' %>"<% } %>><% } %></label><% }); %>
+<button>Save</button> <a class="button gray" href="/<%= key %>">Cancel</a></form><%- include('footer') %>

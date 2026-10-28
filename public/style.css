@@ -1,10 +1,10 @@
 body { margin: 0; font-family: Arial, sans-serif; background: #f4f7f6; color: #222; }
-header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 12px 20px; background: #0e6b58; }
+header { display: flex; justify-content: space-between; padding: 12px 20px; background: #0e6b58; }
 header a { color: #fff; text-decoration: none; margin-left: 16px; }
 .brand { font-weight: bold; font-size: 1.2rem; margin-left: 0; }
-main { max-width: 1000px; margin: 0 auto; padding: 20px; }
+main { max-width: 900px; margin: 0 auto; padding: 20px; }
 label { display: block; margin-bottom: 10px; }
-input, select { padding: 8px; margin-top: 4px; width: 100%; box-sizing: border-box; }
+input { padding: 8px; margin-top: 4px; width: 100%; box-sizing: border-box; }
 button, .button { display: inline-block; padding: 8px 14px; background: #f2b705; color: #222; border: 0; border-radius: 4px; cursor: pointer; text-decoration: none; font-size: 0.95rem; }
 .button.danger, button.danger { background: #b3261e; color: #fff; }
 .button.gray { background: #ccd6d3; }
@@ -15,8 +15,11 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #dde5e2; text-align: left; 
 th { background: #e6eeeb; }
 .message { padding: 10px; background: #e3f4ec; border-left: 4px solid #0e6b58; }
 .message.error { background: #fbe9e7; border-left-color: #b3261e; }
-.hint { color: #666; font-size: 0.9rem; margin-top: 0; }
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
-.module { display: block; background: #fff; padding: 16px; border-radius: 8px; border-top: 4px solid #0e6b58; color: #222; text-decoration: none; }
-.module strong { display: block; font-size: 1.1rem; }
-.module .count { display: block; font-size: 2rem; font-weight: bold; color: #0e6b58; }
+
+select { padding: 8px; margin: 4px 0 10px; width: 100%; box-sizing: border-box; }
+nav { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.inline { display: inline; } .quantity { width: 75px; } .table-wrap { overflow-x: auto; }
+footer { text-align: center; color: #58645e; padding: 24px; font-size: 13px; }
+.identity { color: #52665a; } td .button { margin: 3px 0; font-size: 13px; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+@media (max-width: 700px) { header { display: block; } nav { margin-top: 12px; } main { padding: 12px; } table { font-size: 13px; } }

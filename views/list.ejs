@@ -1,31 +1,4 @@
-<%- include('header') %>
-<h1><%= config.title %></h1>
-<% if (message) { %><p class="message <%= isError ? 'error' : '' %>"><%= message %></p><% } %>
-
-<form class="row" method="get" action="<%= config.path %>">
-  <input name="keyword" placeholder="<%= config.searchHint %>" value="<%= keyword %>">
-  <button>Search</button>
-  <a class="button" href="<%= config.path %>/new">Add <%= config.singular %></a>
-</form>
-
-<% if (results !== null) { %>
-  <h2>Search results for "<%= keyword %>"</h2>
-  <% if (results.length === 0) { %>
-    <p class="message error">No <%= config.singular %> found. Try another keyword.</p>
-  <% } else { %>
-    <%- include('table', { rows: results, showActions: true }) %>
-  <% } %>
-<% } %>
-
-<% if (highlight) { %>
-  <h2>Updated <%= config.singular %></h2>
-  <%- include('table', { rows: [highlight], showActions: false }) %>
-<% } %>
-
-<h2>All <%= config.title.toLowerCase() %> (<%= items.length %>)</h2>
-<% if (items.length === 0) { %>
-  <p>No data yet.</p>
-<% } else { %>
-  <%- include('table', { rows: items, showActions: false }) %>
-<% } %>
-<%- include('footer') %>
+<%- include('header') %><h1><%= config.title %></h1><form method="get" class="row"><input name="keyword" placeholder="Search by ID or text" value="<%= keyword %>"><button>Search</button><a class="button gray" href="/<%= key %>">Reset</a></form>
+<% if (user && (user.role === 'Admin' || (key === 'products' && user.role === 'Seller' && user.accountStatus === 'Approved'))) { %><p><a class="button" href="/<%= key %>/new">Add <%= config.single.toLowerCase() %></a></p><% } %>
+<% if (results !== null) { %><h2>Search results</h2><% if (!results.length) { %><p class="message error">Not found. Try another keyword.</p><% } else { %><%- include('recordTable', { records: results }) %><% } %><% } %>
+<h2>All <%= key %> (<%= all.length %>)</h2><%- include('recordTable', { records: all }) %><%- include('footer') %>

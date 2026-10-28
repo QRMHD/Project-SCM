@@ -1,61 +1,48 @@
-import { BaseManager } from './BaseManager.js';
 import { Order } from '../models/Order.js';
-import { Payment } from '../models/Payment.js';
-import { PaymentGateway } from '../models/PaymentGateway.js';
-
-// Order links the Customer, Product and Payment modules together
-export class OrderManager extends BaseManager {
-  constructor(customerManager, productManager) {
-    super(Order, []);
-    this.customerManager = customerManager;
-    this.productManager = productManager;
-    this.paymentGateway = new PaymentGateway();
+export class OrderManager {
+  constructor(store, products, carts) { this.store = store; this.products = products; this.carts = carts; }
+  getAll() { return this.store.data.orders; }
+  findById(id) { return this.getAll().find(o => o.orderId === Number(id)); }
+  checkout(customerId) {
+    return this.store.transaction(() => {
+      const cart = this.carts.get(customerId);
+      if (!cart.items.length) throw new Error('Cart is empty.');
+      const customer = this.store.data.users.find(u => u.userId === customerId && u.role === 'Customer');
+      if (!customer) throw new Error('Customer not found.');
+      const items = cart.items.map(item => {
+        const p = this.products.findById(item.productId);
+        if (!p || p.stockQuantity < item.quantity) throw new Error('Stock changed. Update the cart.');
+        const seller = this.store.data.users.find(u => u.userId === p.sellerId && u.accountStatus === 'Approved');
+        if (!seller) throw new Error('Seller is not approved.');
+        return { productId: p.productId, productName: p.productName, price: p.price, quantity: item.quantity };
+      });
+      const sellerId = this.products.findById(items[0].productId).sellerId;
+      if (items.some(i => this.products.findById(i.productId).sellerId !== sellerId)) throw new Error('An order must use one seller.');
+      const order = new Order(this.store.nextId('order'), customerId, sellerId, items, customer.address);
+      items.forEach(i => { this.products.findById(i.productId).stockQuantity -= i.quantity; });
+      this.getAll().push(order);
+      cart.items = [];
+      return order;
+    });
   }
-
-  // Create: check stock -> pay -> reduce stock -> save order
-  placeOrder(customerId, productId, quantity, cardNumber) {
-    const customer = this.customerManager.findById(customerId);
-    const product = this.productManager.findById(productId);
-
-    if (!customer || !product) throw new Error('Choose a customer and a product.');
-    if (!Number.isInteger(quantity) || quantity < 1) throw new Error('Quantity must be 1 or more.');
-    if (product.stockQuantity < quantity) throw new Error(`Only ${product.stockQuantity} in stock.`);
-
-    const totalAmount = product.price * quantity;
-    const payment = new Payment(this.lastId + 1, totalAmount);
-    if (!payment.makePayment(this.paymentGateway, cardNumber)) {
-      throw new Error('Payment failed. Check the card number.');
-    }
-
-    product.stockQuantity -= quantity;
-    return this.create(customerId, productId, quantity, totalAmount, 'PLACED', payment.paymentStatus);
+  updateStatus(id, status) {
+    return this.store.transaction(() => {
+      const order = this.findById(id);
+      if (!order) throw new Error('Order not found.');
+      const next = { Pending: ['Cancelled'], Paid: ['Processing'], Processing: ['Shipped'], Shipped: ['Completed'], Completed: [], Cancelled: [] };
+      if (next[order.orderStatus].indexOf(status) === -1) throw new Error('Invalid order status change.');
+      if (status === 'Cancelled') order.items.forEach(i => { this.products.findById(i.productId).stockQuantity += i.quantity; });
+      order.orderStatus = status;
+      return order;
+    });
   }
-
-  // Edit: only the order status can change
-  updateOrderStatus(orderId, orderStatus) {
-    const order = this.findById(orderId);
-    if (!order) return null;
-    order.orderStatus = orderStatus;
-    return order;
-  }
-
-  // Delete: cancel the order and give the stock back
-  cancelOrder(orderId) {
-    const order = this.findById(orderId);
-    if (!order) return false;
-
-    const product = this.productManager.findById(order.productId);
-    if (product) product.stockQuantity += order.quantity;
-    return this.delete(orderId);
-  }
-
-  // Search by order ID, customer name or order status
-  search(keyword) {
-    const text = keyword.trim().toLowerCase();
-    return this.items.filter((order) => {
-      const customer = this.customerManager.findById(order.customerId);
-      const searchText = `${order.orderId} ${customer ? customer.name : ''} ${order.orderStatus}`;
-      return searchText.toLowerCase().includes(text);
+  delete(id) {
+    return this.store.transaction(() => {
+      const order = this.findById(id);
+      if (!order) throw new Error('Order not found.');
+      if (order.orderStatus !== 'Cancelled') throw new Error('Only cancelled orders can be deleted.');
+      if (this.store.data.payments.some(p => p.orderId === order.orderId)) throw new Error('Delete failed payment attempts first.');
+      this.getAll().splice(this.getAll().indexOf(order), 1);
     });
   }
 }

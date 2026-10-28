@@ -1,13 +1,9 @@
 export class Payment {
-  constructor(paymentId, amount) {
+  constructor(paymentId, orderId, amount, paymentStatus) {
     this.paymentId = paymentId;
+    this.orderId = orderId;
     this.amount = amount;
-    this.paymentStatus = 'PENDING';
-  }
-
-  makePayment(gateway, cardNumber) {
-    const isSuccess = gateway.processPayment(this.amount, cardNumber);
-    this.paymentStatus = isSuccess ? 'PAID' : 'FAILED';
-    return isSuccess;
+    this.paymentStatus = paymentStatus;
+    this.paymentDate = new Date().toISOString();
   }
 }

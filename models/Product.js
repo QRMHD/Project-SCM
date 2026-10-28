@@ -1,30 +1,15 @@
-import { Validator } from '../utils/Validator.js';
-
+import { required, positiveId, stockValue } from './Validation.js';
 export class Product {
-  constructor(productId, productName, price, stockQuantity, categoryId, sellerId) {
-    this.productId = productId;
-    this.productName = productName;
-    this.price = price;
-    this.stockQuantity = stockQuantity;
-    this.categoryId = categoryId;
-    this.sellerId = sellerId;
+  constructor(data) {
+    this.productId = positiveId(data.productId, 'Product ID');
+    this.productName = required(data.productName, 'Product name');
+    this.price = Number(data.price);
+    if (!Number.isFinite(this.price) || this.price <= 0 || this.price > 1000000) throw new Error('Price must be above 0 and at most RM 1,000,000.');
+    this.price = Math.round(this.price * 100) / 100;
+    if (this.price <= 0) throw new Error('Minimum price is RM 0.01.');
+    this.stockQuantity = stockValue(data.stockQuantity);
+    this.categoryId = positiveId(data.categoryId, 'Category');
+    this.sellerId = positiveId(data.sellerId, 'Seller');
   }
-
-  get productId() { return this._productId; }
-  set productId(productId) { this._productId = Validator.integer(productId, 'Product ID', 1); }
-
-  get productName() { return this._productName; }
-  set productName(productName) { this._productName = Validator.text(productName, 'Product name'); }
-
-  get price() { return this._price; }
-  set price(price) { this._price = Validator.number(price, 'Price'); }
-
-  get stockQuantity() { return this._stockQuantity; }
-  set stockQuantity(stockQuantity) { this._stockQuantity = Validator.integer(stockQuantity, 'Stock quantity'); }
-
-  get categoryId() { return this._categoryId; }
-  set categoryId(categoryId) { this._categoryId = Validator.integer(categoryId, 'Category', 1); }
-
-  get sellerId() { return this._sellerId; }
-  set sellerId(sellerId) { this._sellerId = Validator.integer(sellerId, 'Seller', 1); }
+  updateStock(quantity) { this.stockQuantity = stockValue(quantity); }
 }
