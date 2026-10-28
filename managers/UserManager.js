@@ -18,6 +18,7 @@ export class UserManager {
       const Model = { Customer, Seller, Admin }[role];
       if (!Model) throw new Error('Invalid role.');
       const user = new Model(Object.assign({}, old || {}, data, { userId: old ? old.userId : this.store.nextId('user') }));
+      // Email uniqueness applies across all roles after model normalization.
       if (this.store.data.users.some(item => item.userId !== user.userId && item.email === user.email)) throw new Error('Email is already registered.');
       if (old) this.store.data.users[this.store.data.users.indexOf(old)] = user;
       else this.store.data.users.push(user);
@@ -25,6 +26,7 @@ export class UserManager {
     });
   }
   delete(id) {
+    // Keep an administrator and protect users referenced by products or orders.
     return this.store.transaction(() => {
       const user = this.findById(id);
       if (!user) throw new Error('User not found.');
@@ -38,6 +40,7 @@ export class UserManager {
     const user = this.store.data.users.find(u => u.email === String(email).trim().toLowerCase());
     if (!user) throw new Error('Incorrect email or password.');
     const Model = { Customer, Seller, Admin }[user.role];
+    // Restore model methods for user records loaded from JSON.
     if (!new Model(user).login(password)) throw new Error('Incorrect email or password.');
     return user;
   }

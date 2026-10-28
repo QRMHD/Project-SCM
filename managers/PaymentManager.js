@@ -10,6 +10,7 @@ export class PaymentManager {
       const status = this.gateway.processPayment(order.totalAmount, outcome);
       const payment = new Payment(this.store.nextId('payment'), order.orderId, order.totalAmount, status);
       this.getAll().push(payment);
+      // Failed attempts stay recorded and leave the order pending for retry.
       if (status === 'Success') order.orderStatus = 'Paid';
       return payment;
     });

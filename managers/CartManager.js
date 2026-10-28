@@ -3,6 +3,7 @@ import { positiveId } from '../models/Validation.js';
 export class CartManager {
   constructor(store, products) { this.store = store; this.products = products; }
   get(customerId) {
+    // Reading an absent cart returns an empty cart without persisting it.
     return this.store.data.carts.find(c => c.customerId === customerId) || new Cart(0, customerId);
   }
   setItem(customerId, productId, quantity, isAdding = false) {
@@ -14,6 +15,7 @@ export class CartManager {
       let cart = this.get(customerId);
       if (!cart.cartId) { cart = new Cart(this.store.nextId('cart'), customerId); this.store.data.carts.push(cart); }
       const existing = cart.items.find(i => i.productId === product.productId);
+      // Setting zero removes an item; adding increments the existing quantity.
       if (Number(quantity) === 0 && !isAdding) { cart.items = cart.items.filter(i => i.productId !== product.productId); return cart; }
       const amount = positiveId(quantity, 'Quantity') + (isAdding && existing ? existing.quantity : 0);
       const seller = this.store.data.users.find(u => u.userId === product.sellerId);

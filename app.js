@@ -28,11 +28,13 @@ function requireRole(req, roles) {
   if (!req.user || roles.indexOf(req.user.role) === -1) throw new Error('Please sign in with an authorised account.');
 }
 function startSession(res, user) {
+  // Keep the user ID server-side; the cookie holds only a random token.
   const token = crypto.randomBytes(32).toString('hex');
   sessions.set(token, { userId: user.userId, expires: Date.now() + 8 * 60 * 60 * 1000 });
   res.setHeader('Set-Cookie', 'olms=' + token + '; HttpOnly; SameSite=Lax; Path=/; Max-Age=28800');
 }
 function orderAccess(req, id) {
+  // Admins can access all orders; customers and sellers need ownership.
   requireRole(req, ['Admin', 'Seller', 'Customer']);
   const order = system.orders.findById(id);
   if (!order || (req.user.role === 'Customer' && order.customerId !== req.user.userId) || (req.user.role === 'Seller' && order.sellerId !== req.user.userId)) throw new Error('Order not found.');
@@ -77,6 +79,7 @@ app.post('/profile', (req, res) => {
   } catch (error) { res.status(400).render('profile', { formData: req.body, error: error.message }); }
 });
 function optionsFor(req) {
+  // Sellers can select only their own approved account for products.
   return {
     categoryId: system.categories.getAll().map(c => ({ value: c.categoryId, label: c.categoryName })),
     sellerId: system.users.getAll('Seller').filter(s => s.accountStatus === 'Approved' && (req.user.role === 'Admin' || s.userId === req.user.userId)).map(s => ({ value: s.userId, label: s.name })),
@@ -84,6 +87,7 @@ function optionsFor(req) {
   };
 }
 function canManage(req, key, record) {
+  // Product writes require seller approval and ownership, or an admin.
   requireRole(req, key === 'products' ? ['Admin', 'Seller'] : ['Admin']);
   if (req.user.role === 'Seller' && (req.user.accountStatus !== 'Approved' || (record && record.sellerId !== req.user.userId))) throw new Error('You can only manage your own products after approval.');
 }
@@ -94,6 +98,7 @@ function displayValue(record, name) {
   return record[name];
 }
 Object.keys(forms).forEach(key => {
+  // Reuse each entity's field definitions for its CRUD routes and views.
   const config = forms[key];
   const manager = system[key];
   const list = (req, res, message = '', error = '') => {
@@ -101,6 +106,7 @@ Object.keys(forms).forEach(key => {
     let all = manager.getAll();
     let results = req.query.keyword === undefined ? null : manager.search(req.query.keyword);
     if (key === 'products' && (!req.user || req.user.role === 'Customer')) {
+      // Public shoppers see products only from approved sellers.
       const visible = p => { const seller = system.users.findById(p.sellerId); return seller && seller.accountStatus === 'Approved'; };
       all = all.filter(visible);
       if (results) results = results.filter(visible);
@@ -122,6 +128,7 @@ Object.keys(forms).forEach(key => {
     canManage(req, key, id ? manager.findById(id) : null);
     try {
       const data = {};
+      // Accept configured fields only; sellers cannot submit another seller ID.
       config.fields.forEach(f => { data[f.name] = req.body[f.name]; });
       if (key === 'products' && req.user.role === 'Seller') data.sellerId = req.user.userId;
       manager.save(id, data);
@@ -192,6 +199,7 @@ app.post('/orders/:id/pay', (req, res) => {
   system.payments.makePayment(order.orderId, req.body.outcome);res.redirect('/orders/' + order.orderId);
 });
 app.get('/payments', (req, res) => {
+  // Payment visibility follows ownership of the associated order.
   requireRole(req, ['Admin', 'Seller', 'Customer']);
   const keyword = String(req.query.keyword || '').toLowerCase();
   const all = system.payments.getAll().filter(p => { const o = system.orders.findById(p.orderId);return o && (req.user.role === 'Admin' || (req.user.role === 'Seller' ? o.sellerId : o.customerId) === req.user.userId); });

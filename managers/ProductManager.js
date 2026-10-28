@@ -24,6 +24,7 @@ export class ProductManager {
     });
   }
   delete(id) {
+    // Preserve products referenced by carts or historical orders.
     return this.store.transaction(() => {
       const product = this.findById(id);
       if (!product) throw new Error('Product not found.');

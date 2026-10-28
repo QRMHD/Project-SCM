@@ -7,6 +7,7 @@ export class DataStore {
     if (fs.existsSync(filePath)) {
       const saved = JSON.parse(fs.readFileSync(filePath, 'utf8'));
       if (saved.users) this.data = saved;
+      // Reject populated legacy files instead of silently discarding records.
       else if (Object.keys(saved).some(key => Array.isArray(saved[key]) && saved[key].length)) {
         throw new Error('Old data format contains records. Back up and migrate it before starting.');
       }
@@ -23,6 +24,7 @@ export class DataStore {
     catch (error) { this.data = JSON.parse(original); throw error; }
   }
   save() {
+    // Write a temporary file before replacing the current data file.
     fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
     fs.writeFileSync(this.filePath + '.tmp', JSON.stringify(this.data, null, 2));
     fs.renameSync(this.filePath + '.tmp', this.filePath);

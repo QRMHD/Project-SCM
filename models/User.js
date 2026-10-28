@@ -12,16 +12,19 @@ export class User {
     if (!this.passwordHash) throw new Error('Password is required.');
   }
   setPassword(password) {
+    // Store a fresh salt with the derived hash, never the password itself.
     if (typeof password !== 'string' || password.length < 8) throw new Error('Password needs at least 8 characters.');
     const salt = crypto.randomBytes(16).toString('hex');
     this.passwordHash = salt + ':' + crypto.pbkdf2Sync(password, salt, 100000, 32, 'sha256').toString('hex');
   }
   login(password) {
+    // Derive the candidate hash with the saved salt and compare in constant time.
     const parts = this.passwordHash.split(':');
     const actual = crypto.pbkdf2Sync(String(password), parts[0], 100000, 32, 'sha256');
     return crypto.timingSafeEqual(actual, Buffer.from(parts[1], 'hex'));
   }
   updateProfile(name, email) {
+    // Reuse the concrete user model's validation before changing profile fields.
     const updated = new this.constructor(Object.assign({}, this, { name, email }));
     this.name = updated.name;
     this.email = updated.email;

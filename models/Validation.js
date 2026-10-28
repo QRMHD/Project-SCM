@@ -8,6 +8,7 @@ export function positiveId(value, label) {
   return number;
 }
 export function stockValue(value) {
+  // Reject decimals and exponent notation before converting stock to a number.
   if (!/^[0-9]+$/.test(String(value))) throw new Error('Stock must be a whole number, 0 or more.');
   const number = Number(value);
   if (!Number.isSafeInteger(number)) throw new Error('Stock is too large.');

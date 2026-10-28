@@ -10,6 +10,7 @@ import { OrderManager } from '../managers/OrderManager.js';
 import { PaymentManager } from '../managers/PaymentManager.js';
 export class System {
   constructor(filePath) {
+    // All managers share one store so related changes can be committed together.
     this.store = new DataStore(filePath);
     this.users = new UserManager(this.store);
     this.customers = new CustomerManager(this.users);
@@ -23,6 +24,7 @@ export class System {
     if (!this.store.data.users.length) this.seed();
   }
   seed() {
+    // Populate demo accounts and products when the store has no users.
     this.users.create('Admin', { name: 'OLMS Admin', email: 'admin@olms.test', password: 'Admin123!' });
     const seller = this.users.create('Seller', { name: 'Kajang Local Mart', email: 'seller@olms.test', password: 'Seller123!', accountStatus: 'Approved' });
     this.users.create('Customer', { name: 'Aisha Rahman', email: 'customer@olms.test', password: 'Customer123!', phone: '0123456789', address: '12 Jalan Mawar, Kajang' });
