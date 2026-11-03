@@ -3,6 +3,19 @@ import path from 'path';
 import crypto from 'crypto';
 import { System } from './services/System.js';
 import { forms } from './services/Forms.js';
+import {
+  sanitiseBody,
+  limitBodyFields,
+  validateLogin,
+  validateRegister,
+  validateProfileUpdate,
+  validateCartItem,
+  validatePayment,
+  validateOrderStatus,
+  notFoundHandler,
+  globalErrorHandler
+} from './middleware/defensive.js';
+import { createApiRouter } from './middleware/api.js';
 
 const ROOT = path.resolve(process.env.OLMS_APP_ROOT || '.');
 const PORT = Number(process.env.PORT || 3000);
@@ -19,6 +32,9 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(ROOT, 'views'));
 app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(ROOT, 'public')));
+app.use(sanitiseBody);
+app.use(limitBodyFields());
+app.use('/api', createApiRouter(system));
 
 // Small local session implementation for the lab's login use case.
 app.use((req, res, next) => {
@@ -77,7 +93,7 @@ app.get('/', (req, res) => res.redirect('/products'));
 
 app.get('/login', (req, res) => res.render('login'));
 
-app.post('/login', (req, res) => {
+app.post('/login', validateLogin, (req, res) => {
   try {
     const user = system.users.login(req.body.email, req.body.password);
     if (req.sessionToken) {
@@ -101,7 +117,7 @@ app.post('/logout', (req, res) => {
 
 app.get('/register', (req, res) => res.render('register', { formData: {} }));
 
-app.post('/register', (req, res) => {
+app.post('/register', validateRegister, (req, res) => {
   try {
     if (['Customer', 'Seller'].indexOf(req.body.role) === -1) {
       throw new Error('Select Customer or Seller.');
@@ -124,7 +140,7 @@ app.get('/profile', (req, res) => {
   res.render('profile', { formData: req.user });
 });
 
-app.post('/profile', (req, res) => {
+app.post('/profile', validateProfileUpdate, (req, res) => {
   requireRole(req, ['Admin', 'Seller', 'Customer']);
   try {
     const data = {
@@ -329,7 +345,7 @@ app.get('/cart', (req, res) => {
   res.render('cart', { items, total });
 });
 
-app.post('/cart/items', (req, res) => {
+app.post('/cart/items', validateCartItem, (req, res) => {
   requireRole(req, ['Customer']);
   system.carts.setItem(
     req.user.userId,
@@ -385,7 +401,7 @@ app.get('/orders/:id', (req, res) => {
   });
 });
 
-app.post('/orders/:id/status', (req, res) => {
+app.post('/orders/:id/status', validateOrderStatus, (req, res) => {
   const order = orderAccess(req, req.params.id);
   if (req.user.role === 'Customer' && req.body.orderStatus !== 'Cancelled') {
     throw new Error('Customers may only cancel pending orders.');
@@ -414,7 +430,7 @@ app.post('/orders/:id/delete', (req, res) => {
   res.redirect('/orders');
 });
 
-app.post('/orders/:id/pay', (req, res) => {
+app.post('/orders/:id/pay', validatePayment, (req, res) => {
   const order = orderAccess(req, req.params.id);
   requireRole(req, ['Customer']);
   system.payments.makePayment(order.orderId, req.body.outcome);
@@ -470,13 +486,8 @@ app.post('/payments/:id/delete', (req, res) => {
   res.redirect('/payments');
 });
 
-app.use((req, res) => {
-  res.status(404).render('error', { error: 'Page not found.' });
-});
-
-app.use((error, req, res, next) => {
-  res.status(400).render('error', { error: error.message });
-});
+app.use(notFoundHandler);
+app.use(globalErrorHandler);
 
 app.listen(PORT, '127.0.0.1', () => {
   console.log('OLMS running at http://localhost:' + PORT);

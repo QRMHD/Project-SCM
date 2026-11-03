@@ -4,10 +4,13 @@
   "type": "module",
   "scripts": {
     "start": "node app.js",
-    "test": "node tests/integration.js"
+    "test": "node tests/integration.js && node tests/schemas.test.js",
+    "test:integration": "node tests/integration.js",
+    "test:schemas": "node tests/schemas.test.js"
   },
   "dependencies": {
     "ejs": "^3.1.10",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "zod": "^3.24.2"
   }
 }
