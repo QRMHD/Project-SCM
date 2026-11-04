@@ -11,10 +11,9 @@ import {
   validateProfileUpdate,
   validateCartItem,
   validatePayment,
-  validateOrderStatus,
-  notFoundHandler,
-  globalErrorHandler
+  validateOrderStatus
 } from './middleware/defensive.js';
+import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 import { createApiRouter } from './middleware/api.js';
 
 const ROOT = path.resolve(process.env.OLMS_APP_ROOT || '.');
@@ -487,7 +486,7 @@ app.post('/payments/:id/delete', (req, res) => {
 });
 
 app.use(notFoundHandler);
-app.use(globalErrorHandler);
+app.use(errorHandler);
 
 app.listen(PORT, '127.0.0.1', () => {
   console.log('OLMS running at http://localhost:' + PORT);

@@ -157,41 +157,24 @@ export function sanitiseOutput(data) {
   return data;
 }
 
-// ─── 4. Error Handling ────────────────────────────────────────────────────────
+// ─── 4. Error Handling (Delegated to errorHandler.js) ─────────────────────────
 
-/**
- * Catch-all 404 handler — must be registered after all other routes.
- */
-export function notFoundHandler(req, res) {
-  res.status(404).render('error', { error: 'Page not found.' });
-}
+export {
+  AppError,
+  BadRequestError,
+  UnauthorizedError,
+  ForbiddenError,
+  NotFoundError,
+  asyncHandler,
+  notFoundHandler,
+  errorHandler,
+  errorHandler as globalErrorHandler
+} from './errorHandler.js';
 
-/**
- * Global error handler — must be registered as the very last middleware
- * (four-argument signature required by Express).
- * Distinguishes between expected application errors (400) and unexpected
- * server errors (500) so the client always receives a readable message.
- */
-export function globalErrorHandler(err, req, res, next) { // eslint-disable-line no-unused-vars
-  const isAppError = err.isAppError === true;
-  const status = isAppError ? 400 : 500;
-  const message = isAppError || process.env.NODE_ENV !== 'production'
-    ? err.message
-    : 'An unexpected error occurred. Please try again.';
-
-  console.error(`[${new Date().toISOString()}] ${status} ${req.method} ${req.path} — ${err.message}`);
-
-  res.status(status).render('error', { error: message });
-}
-
-/**
- * Mark an error as an expected application-level error so the global handler
- * returns a 400 instead of a 500.
- * Usage: throw appError('Cart is empty.');
- */
 export function appError(message) {
   const err = new Error(message);
-  err.isAppError = true;
+  err.isOperational = true;
+  err.statusCode = 400;
   return err;
 }
 
