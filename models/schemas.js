@@ -4,9 +4,11 @@ import { z } from 'zod';
  * Reusable primitive schemas matching OLMS validation rules
  */
 export const positiveIdSchema = z.coerce
-  .number()
-  .int('Must be an integer')
-  .positive('Must be a positive integer');
+  .string()
+  .regex(/^[1-9][0-9]*$/, 'Must be a positive integer')
+  .transform(Number)
+  .refine(Number.isSafeInteger, 'Number is too large');
+  
 
 export const requiredStringSchema = (label = 'Field') =>
   z.string({ required_error: `${label} is required.` })
