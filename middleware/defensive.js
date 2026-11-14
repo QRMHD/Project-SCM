@@ -69,7 +69,9 @@ export function limitBodyFields(max = 20) {
     }
     next();
   };
-}
+ }
+// After review the code by Mohamed this middleware is not nessecere
+
 
 // ─── 2. Schema Validation (per-route) ────────────────────────────────────────
 

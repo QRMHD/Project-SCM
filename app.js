@@ -15,6 +15,7 @@ import {
 } from './middleware/defensive.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 import { createApiRouter } from './middleware/api.js';
+import { flashMiddleware } from './middleware/flash.js';
 
 const ROOT = path.resolve(process.env.OLMS_APP_ROOT || '.');
 const PORT = Number(process.env.PORT || 3000);
@@ -52,6 +53,9 @@ app.use((req, res, next) => {
 
   next();
 });
+
+// Flash messages — must come after session middleware so req.sessionToken exists.
+app.use(flashMiddleware(sessions));
 
 function requireRole(req, roles) {
   if (!req.user || roles.indexOf(req.user.role) === -1) {
@@ -99,6 +103,7 @@ app.post('/login', validateLogin, (req, res) => {
       sessions.delete(req.sessionToken);
     }
     startSession(res, user);
+    req.flash('success', 'Welcome back, ' + user.name + '!');
     res.redirect('/products');
   } catch (error) {
     res.status(400).render('login', { error: error.message });
@@ -111,6 +116,7 @@ app.post('/logout', (req, res) => {
     'Set-Cookie',
     'olms=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0'
   );
+  req.flash('info', 'You have been signed out.');
   res.redirect('/login');
 });
 
@@ -123,9 +129,8 @@ app.post('/register', validateRegister, (req, res) => {
     }
     const data = Object.assign({}, req.body, { accountStatus: 'Pending' });
     system.users.create(req.body.role, data);
-    res.render('login', {
-      message: 'Account created. Sellers need administrator approval before adding products.'
-    });
+    req.flash('success', 'Account created. Sellers need administrator approval before adding products.');
+    res.redirect('/login');
   } catch (error) {
     res.status(400).render('register', {
       error: error.message,
@@ -155,7 +160,8 @@ app.post('/profile', validateProfileUpdate, (req, res) => {
     }
     const user = system.users.edit(req.user.role, req.user.userId, data);
     res.locals.user = user;
-    res.render('profile', { formData: user, message: 'Profile updated.' });
+    req.flash('success', 'Profile updated.');
+    res.redirect('/profile');
   } catch (error) {
     res.status(400).render('profile', {
       formData: req.body,
@@ -352,6 +358,7 @@ app.post('/cart/items', validateCartItem, (req, res) => {
     req.body.quantity,
     req.body.operation === 'add'
   );
+  req.flash('success', 'Cart updated.');
   res.redirect('/cart');
 });
 
@@ -368,12 +375,14 @@ app.get('/cart/clear', (req, res) => {
 app.post('/cart/clear', (req, res) => {
   requireRole(req, ['Customer']);
   system.carts.clear(req.user.userId);
+  req.flash('success', 'Cart cleared.');
   res.redirect('/cart');
 });
 
 app.post('/checkout', (req, res) => {
   requireRole(req, ['Customer']);
   const order = system.orders.checkout(req.user.userId);
+  req.flash('success', 'Order #' + order.orderId + ' placed successfully!');
   res.redirect('/orders/' + order.orderId);
 });
 
@@ -406,6 +415,7 @@ app.post('/orders/:id/status', validateOrderStatus, (req, res) => {
     throw new Error('Customers may only cancel pending orders.');
   }
   system.orders.updateStatus(order.orderId, req.body.orderStatus);
+  req.flash('success', 'Order status updated to ' + req.body.orderStatus + '.');
   res.redirect('/orders/' + order.orderId);
 });
 
@@ -426,6 +436,7 @@ app.post('/orders/:id/delete', (req, res) => {
   const order = orderAccess(req, req.params.id);
   requireRole(req, ['Admin', 'Customer']);
   system.orders.delete(order.orderId);
+  req.flash('success', 'Order deleted.');
   res.redirect('/orders');
 });
 
@@ -433,6 +444,7 @@ app.post('/orders/:id/pay', validatePayment, (req, res) => {
   const order = orderAccess(req, req.params.id);
   requireRole(req, ['Customer']);
   system.payments.makePayment(order.orderId, req.body.outcome);
+  req.flash('success', 'Payment processed.');
   res.redirect('/orders/' + order.orderId);
 });
 
@@ -482,6 +494,7 @@ app.post('/payments/:id/delete', (req, res) => {
   }
   orderAccess(req, payment.orderId);
   system.payments.delete(payment.paymentId);
+  req.flash('success', 'Payment record deleted.');
   res.redirect('/payments');
 });
 
