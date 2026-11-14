@@ -81,7 +81,8 @@ export function errorHandler(err, req, res, next) { // eslint-disable-line no-un
   // Map Zod validation errors (e.g. from schema validation)
   if (err.name === 'ZodError') {
     statusCode = 400;
-    message = err.errors?.[0]?.message || 'Validation failed.';
+    const issues = err.issues || err.errors || [];
+    message = issues[0]?.message || 'Validation failed.';
   }
 
   // Map JSON body parser syntax errors

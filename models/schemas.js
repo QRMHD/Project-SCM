@@ -214,9 +214,10 @@ export const updateOrderStatusRequestSchema = z.object({
 export function validate(schema, data) {
   const result = schema.safeParse(data);
   if (!result.success) {
-    const firstError = result.error.errors[0]?.message || 'Validation failed';
+    const issues = result.error.issues || result.error.errors || [];
+    const firstError = issues[0]?.message || 'Validation failed';
     const error = new Error(firstError);
-    error.issues = result.error.errors;
+    error.issues = issues;
     throw error;
   }
   return result.data;
