@@ -20,7 +20,7 @@
  */
 
 import { Router } from 'express';
-import { sanitiseId } from './defensive.js';
+import { sanitiseId, sanitiseOutput } from './defensive.js';
 import { positiveIdSchema } from '../models/schemas.js';
 
 /**

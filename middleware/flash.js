@@ -38,9 +38,10 @@ export function flashMiddleware(sessions) {
     // ── req.flash(type, message) ─────────────────────────────────────────
     // Stores a message that will be available on the very next request only.
     req.flash = (type, message) => {
-      if (!token || !sessions.has(token)) return;
+      const activeToken = req.sessionToken;
+      if (!activeToken || !sessions.has(activeToken)) return;
 
-      const current = sessions.get(token);
+      const current = sessions.get(activeToken);
       if (!current.flash) {
         current.flash = {};
       }
