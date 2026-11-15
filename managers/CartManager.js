@@ -1,3 +1,4 @@
+import { BadRequestError, NotFoundError } from '../middleware/errorHandler.js';
 import { Cart } from '../models/Cart.js';
 import { positiveId } from '../models/Validation.js';
 
@@ -20,12 +21,12 @@ export class CartManager {
         u => u.userId === customerId && u.role === 'Customer'
       );
       if (!customer) {
-        throw new Error('Customer not found.');
+        throw new NotFoundError('Customer not found.');
       }
 
       const product = this.products.findById(productId);
       if (!product) {
-        throw new Error('Product not found.');
+        throw new NotFoundError('Product not found.');
       }
 
       let cart = this.get(customerId);
@@ -47,15 +48,15 @@ export class CartManager {
 
       const seller = this.store.data.users.find(u => u.userId === product.sellerId);
       if (!seller || seller.accountStatus !== 'Approved') {
-        throw new Error('Seller is not approved.');
+        throw new BadRequestError('Seller is not approved.');
       }
 
       if (cart.items.some(i => this.products.findById(i.productId).sellerId !== product.sellerId)) {
-        throw new Error('Use one seller per order. Checkout or clear the current cart first.');
+        throw new BadRequestError('Use one seller per order. Checkout or clear the current cart first.');
       }
 
       if (amount > product.stockQuantity) {
-        throw new Error('Not enough stock.');
+        throw new BadRequestError('Not enough stock.');
       }
 
       if (existing) {

@@ -1,3 +1,4 @@
+import { BadRequestError, NotFoundError } from '../middleware/errorHandler.js';
 import { Order } from '../models/Order.js';
 
 export class OrderManager {
@@ -21,28 +22,28 @@ export class OrderManager {
     return this.store.transaction(() => {
       const cart = this.carts.get(customerId);
       if (!cart.items.length) {
-        throw new Error('Cart is empty.');
+        throw new BadRequestError('Cart is empty.');
       }
 
       const customer = this.store.data.users.find(
         u => u.userId === customerId && u.role === 'Customer'
       );
       if (!customer) {
-        throw new Error('Customer not found.');
+        throw new NotFoundError('Customer not found.');
       }
 
       const items = cart.items.map(item => {
         // Recheck availability and snapshot names and prices for order history.
         const p = this.products.findById(item.productId);
         if (!p || p.stockQuantity < item.quantity) {
-          throw new Error('Stock changed. Update the cart.');
+          throw new BadRequestError('Stock changed. Update the cart.');
         }
 
         const seller = this.store.data.users.find(
           u => u.userId === p.sellerId && u.accountStatus === 'Approved'
         );
         if (!seller) {
-          throw new Error('Seller is not approved.');
+          throw new BadRequestError('Seller is not approved.');
         }
 
         return {
@@ -55,7 +56,7 @@ export class OrderManager {
 
       const sellerId = this.products.findById(items[0].productId).sellerId;
       if (items.some(i => this.products.findById(i.productId).sellerId !== sellerId)) {
-        throw new Error('An order must use one seller.');
+        throw new BadRequestError('An order must use one seller.');
       }
 
       const order = new Order(
@@ -80,7 +81,7 @@ export class OrderManager {
     return this.store.transaction(() => {
       const order = this.findById(id);
       if (!order) {
-        throw new Error('Order not found.');
+        throw new NotFoundError('Order not found.');
       }
 
       const next = {
@@ -94,7 +95,7 @@ export class OrderManager {
 
       // Allowed transitions prevent skipped fulfilment and repeated stock returns.
       if (next[order.orderStatus].indexOf(status) === -1) {
-        throw new Error('Invalid order status change.');
+        throw new BadRequestError('Invalid order status change.');
       }
 
       if (status === 'Cancelled') {
@@ -112,15 +113,15 @@ export class OrderManager {
     return this.store.transaction(() => {
       const order = this.findById(id);
       if (!order) {
-        throw new Error('Order not found.');
+        throw new NotFoundError('Order not found.');
       }
 
       if (order.orderStatus !== 'Cancelled') {
-        throw new Error('Only cancelled orders can be deleted.');
+        throw new BadRequestError('Only cancelled orders can be deleted.');
       }
 
       if (this.store.data.payments.some(p => p.orderId === order.orderId)) {
-        throw new Error('Delete failed payment attempts first.');
+        throw new BadRequestError('Delete failed payment attempts first.');
       }
 
       this.getAll().splice(this.getAll().indexOf(order), 1);

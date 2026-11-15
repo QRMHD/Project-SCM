@@ -3,8 +3,10 @@ import path from 'path';
 import crypto from 'crypto';
 import { System } from './services/System.js';
 import { forms } from './services/Forms.js';
+import { ORDER_ROLES, canViewOrder, canViewProduct } from './services/Visibility.js';
 import {
   sanitiseBody,
+  sanitiseId,
   limitBodyFields,
   validateLogin,
   validateRegister,
@@ -13,7 +15,10 @@ import {
   validatePayment,
   validateOrderStatus
 } from './middleware/defensive.js';
-import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
+import {
+  BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError,
+  notFoundHandler, errorHandler
+} from './middleware/errorHandler.js';
 import { createApiRouter } from './middleware/api.js';
 import { flashMiddleware } from './middleware/flash.js';
 
@@ -27,14 +32,12 @@ const system = new System(
 );
 
 const sessions = new Map();
+const SESSION_SECONDS = 8 * 60 * 60;
+const COOKIE_FLAGS = '; HttpOnly; SameSite=Lax; Path=/; Max-Age=';
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(ROOT, 'views'));
-app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(ROOT, 'public')));
-app.use(sanitiseBody);
-app.use(limitBodyFields());
-app.use('/api', createApiRouter(system));
 
 // Small local session implementation for the lab's login use case.
 app.use((req, res, next) => {
@@ -56,40 +59,53 @@ app.use((req, res, next) => {
 
 // Flash messages — must come after session middleware so req.sessionToken exists.
 app.use(flashMiddleware(sessions));
+app.use(express.urlencoded({ extended: false, limit: '100kb' }));
+app.use(express.json({ limit: '100kb' }));
+app.use(limitBodyFields(20));
+app.use(sanitiseBody);
+
+// The API needs req.user from the session middleware.
+app.use('/api', createApiRouter(system));
+app.param('id', sanitiseId);
 
 function requireRole(req, roles) {
-  if (!req.user || roles.indexOf(req.user.role) === -1) {
-    throw new Error('Please sign in with an authorised account.');
-  }
+  if (!req.user) throw new UnauthorizedError();
+  if (!roles.includes(req.user.role)) throw new ForbiddenError();
 }
 
-function startSession(res, user) {
+function signInRequired(req, res, next) {
+  requireRole(req, ORDER_ROLES);
+  next();
+}
+
+function startSession(req, res, user) {
   // Keep the user ID server-side; the cookie holds only a random token.
   const token = crypto.randomBytes(32).toString('hex');
   sessions.set(token, {
     userId: user.userId,
-    expires: Date.now() + 8 * 60 * 60 * 1000
+    expires: Date.now() + SESSION_SECONDS * 1000
   });
-  res.setHeader(
-    'Set-Cookie',
-    'olms=' + token + '; HttpOnly; SameSite=Lax; Path=/; Max-Age=28800'
-  );
+  req.sessionToken = token;
+  setSessionCookie(res, token, SESSION_SECONDS);
 }
 
-function orderAccess(req, id) {
-  // Admins can access all orders; customers and sellers need ownership.
-  requireRole(req, ['Admin', 'Seller', 'Customer']);
-  const order = system.orders.findById(id);
+function setSessionCookie(res, token, maxAge) {
+  res.setHeader('Set-Cookie', 'olms=' + token + COOKIE_FLAGS + maxAge);
+}
 
-  if (
-    !order ||
-    (req.user.role === 'Customer' && order.customerId !== req.user.userId) ||
-    (req.user.role === 'Seller' && order.sellerId !== req.user.userId)
-  ) {
-    throw new Error('Order not found.');
-  }
-
+function orderAccess(req, orderId) {
+  requireRole(req, ORDER_ROLES);
+  const order = system.orders.findById(orderId);
+  if (!canViewOrder(req.user, order)) throw new NotFoundError('Order not found.');
   return order;
+}
+
+function paymentAccess(req) {
+  requireRole(req, ['Admin', 'Customer']);
+  const payment = system.payments.findById(req.numericId);
+  if (!payment) throw new NotFoundError('Payment not found.');
+  orderAccess(req, payment.orderId);
+  return payment;
 }
 
 app.get('/', (req, res) => res.redirect('/products'));
@@ -99,10 +115,8 @@ app.get('/login', (req, res) => res.render('login'));
 app.post('/login', validateLogin, (req, res) => {
   try {
     const user = system.users.login(req.body.email, req.body.password);
-    if (req.sessionToken) {
-      sessions.delete(req.sessionToken);
-    }
-    startSession(res, user);
+    sessions.delete(req.sessionToken);
+    startSession(req, res, user);
     req.flash('success', 'Welcome back, ' + user.name + '!');
     res.redirect('/products');
   } catch (error) {
@@ -112,11 +126,7 @@ app.post('/login', validateLogin, (req, res) => {
 
 app.post('/logout', (req, res) => {
   sessions.delete(req.sessionToken);
-  res.setHeader(
-    'Set-Cookie',
-    'olms=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0'
-  );
-  req.flash('info', 'You have been signed out.');
+  setSessionCookie(res, '', 0);
   res.redirect('/login');
 });
 
@@ -124,13 +134,13 @@ app.get('/register', (req, res) => res.render('register', { formData: {} }));
 
 app.post('/register', validateRegister, (req, res) => {
   try {
-    if (['Customer', 'Seller'].indexOf(req.body.role) === -1) {
-      throw new Error('Select Customer or Seller.');
-    }
     const data = Object.assign({}, req.body, { accountStatus: 'Pending' });
     system.users.create(req.body.role, data);
-    req.flash('success', 'Account created. Sellers need administrator approval before adding products.');
-    res.redirect('/login');
+    res.render('login', {
+      message: req.body.role === 'Seller'
+        ? 'Account created. Sellers need administrator approval before adding products.'
+        : 'Account created. You can now sign in.'
+    });
   } catch (error) {
     res.status(400).render('register', {
       error: error.message,
@@ -139,13 +149,11 @@ app.post('/register', validateRegister, (req, res) => {
   }
 });
 
-app.get('/profile', (req, res) => {
-  requireRole(req, ['Admin', 'Seller', 'Customer']);
+app.get('/profile', signInRequired, (req, res) => {
   res.render('profile', { formData: req.user });
 });
 
-app.post('/profile', validateProfileUpdate, (req, res) => {
-  requireRole(req, ['Admin', 'Seller', 'Customer']);
+app.post('/profile', signInRequired, validateProfileUpdate, (req, res) => {
   try {
     const data = {
       name: req.body.name,
@@ -199,7 +207,7 @@ function canManage(req, key, record) {
     (req.user.accountStatus !== 'Approved' ||
       (record && record.sellerId !== req.user.userId))
   ) {
-    throw new Error(
+    throw new ForbiddenError(
       'You can only manage your own products after approval.'
     );
   }
@@ -235,49 +243,40 @@ Object.keys(forms).forEach(key => {
       ? null
       : manager.search(req.query.keyword);
 
-    if (key === 'products' && (!req.user || req.user.role === 'Customer')) {
-      // Public shoppers see products only from approved sellers.
-      const visible = p => {
-        const seller = system.users.findById(p.sellerId);
-        return seller && seller.accountStatus === 'Approved';
-      };
-      all = all.filter(visible);
-      if (results) {
-        results = results.filter(visible);
-      }
+    if (key === 'products') {
+      const isVisible = product => canViewProduct(req.user, product, system.users);
+      all = all.filter(isVisible);
+      if (results) results = results.filter(isVisible);
     }
 
     res.render('list', {
       key, config, all, results,
       keyword: req.query.keyword || '',
-      message, error, displayValue
+      message: message || res.locals.message,
+      error: error || res.locals.error,
+      displayValue
     });
   };
+
+  function renderForm(req, res, formData, id, error) {
+    const fields = { key, config, formData, id, options: optionsFor(req) };
+    res.render('form', error === undefined ? fields : Object.assign(fields, { error }));
+  }
 
   app.get('/' + key, (req, res) => list(req, res));
 
   app.get('/' + key + '/new', (req, res) => {
     canManage(req, key);
-    res.render('form', {
-      key, config,
-      formData: {},
-      options: optionsFor(req),
-      id: null
-    });
+    renderForm(req, res, {}, null);
   });
 
   app.get('/' + key + '/:id/edit', (req, res) => {
-    const record = manager.findById(req.params.id);
+    const record = manager.findById(req.numericId);
     canManage(req, key, record);
     if (!record) {
       return list(req, res, '', config.single + ' not found.');
     }
-    res.render('form', {
-      key, config,
-      formData: record,
-      options: optionsFor(req),
-      id: record[config.id]
-    });
+    renderForm(req, res, record, record[config.id]);
   });
 
   const save = (req, res, id) => {
@@ -294,24 +293,18 @@ Object.keys(forms).forEach(key => {
       manager.save(id, data);
       list(req, res, config.single + (id ? ' was updated.' : ' was added.'));
     } catch (error) {
-      res.status(400).render('form', {
-        key, config,
-        formData: req.body,
-        options: optionsFor(req),
-        id,
-        error: error.message
-      });
+      renderForm(req, res.status(400), req.body, id, error.message);
     }
   };
 
   app.post('/' + key, (req, res) => save(req, res, null));
 
   app.post('/' + key + '/:id/edit', (req, res) => {
-    save(req, res, Number(req.params.id));
+    save(req, res, req.numericId);
   });
 
   app.get('/' + key + '/:id/delete', (req, res) => {
-    const record = manager.findById(req.params.id);
+    const record = manager.findById(req.numericId);
     canManage(req, key, record);
     if (!record) {
       return list(req, res, '', config.single + ' not found.');
@@ -327,12 +320,12 @@ Object.keys(forms).forEach(key => {
   });
 
   app.post('/' + key + '/:id/delete', (req, res) => {
-    canManage(req, key, manager.findById(req.params.id));
+    canManage(req, key, manager.findById(req.numericId));
     try {
-      if (config.id === 'userId' && Number(req.params.id) === req.user.userId) {
-        throw new Error('You cannot delete your signed-in account here.');
+      if (config.id === 'userId' && req.numericId === req.user.userId) {
+        throw new BadRequestError('You cannot delete your signed-in account here.');
       }
-      manager.delete(req.params.id);
+      manager.delete(req.numericId);
       list(req, res, config.single + ' was deleted.');
     } catch (error) {
       list(req, res, '', error.message);
@@ -386,13 +379,9 @@ app.post('/checkout', (req, res) => {
   res.redirect('/orders/' + order.orderId);
 });
 
-app.get('/orders', (req, res) => {
-  requireRole(req, ['Admin', 'Seller', 'Customer']);
+app.get('/orders', signInRequired, (req, res) => {
   const keyword = String(req.query.keyword || '').toLowerCase();
-  const all = system.orders.getAll().filter(o =>
-    req.user.role === 'Admin' ||
-    (req.user.role === 'Seller' ? o.sellerId : o.customerId) === req.user.userId
-  );
+  const all = system.orders.getAll().filter(order => canViewOrder(req.user, order));
   const results = all.filter(o =>
     (o.orderId + ' ' + o.orderStatus).toLowerCase().includes(keyword)
   );
@@ -401,18 +390,16 @@ app.get('/orders', (req, res) => {
 
 app.get('/orders/:id', (req, res) => {
   res.render('order', {
-    order: orderAccess(req, req.params.id),
-    payments: system.payments.getAll().filter(
-      p => p.orderId === Number(req.params.id)
-    ),
+    order: orderAccess(req, req.numericId),
+    payments: system.payments.findByOrder(req.numericId),
     system
   });
 });
 
 app.post('/orders/:id/status', validateOrderStatus, (req, res) => {
-  const order = orderAccess(req, req.params.id);
+  const order = orderAccess(req, req.numericId);
   if (req.user.role === 'Customer' && req.body.orderStatus !== 'Cancelled') {
-    throw new Error('Customers may only cancel pending orders.');
+    throw new ForbiddenError('Customers may only cancel pending orders.');
   }
   system.orders.updateStatus(order.orderId, req.body.orderStatus);
   req.flash('success', 'Order status updated to ' + req.body.orderStatus + '.');
@@ -420,7 +407,7 @@ app.post('/orders/:id/status', validateOrderStatus, (req, res) => {
 });
 
 app.get('/orders/:id/delete', (req, res) => {
-  const order = orderAccess(req, req.params.id);
+  const order = orderAccess(req, req.numericId);
   requireRole(req, ['Admin', 'Customer']);
   res.render('confirm', {
     title: 'Delete cancelled order',
@@ -433,7 +420,7 @@ app.get('/orders/:id/delete', (req, res) => {
 });
 
 app.post('/orders/:id/delete', (req, res) => {
-  const order = orderAccess(req, req.params.id);
+  const order = orderAccess(req, req.numericId);
   requireRole(req, ['Admin', 'Customer']);
   system.orders.delete(order.orderId);
   req.flash('success', 'Order deleted.');
@@ -441,24 +428,22 @@ app.post('/orders/:id/delete', (req, res) => {
 });
 
 app.post('/orders/:id/pay', validatePayment, (req, res) => {
-  const order = orderAccess(req, req.params.id);
+  const order = orderAccess(req, req.numericId);
   requireRole(req, ['Customer']);
-  system.payments.makePayment(order.orderId, req.body.outcome);
-  req.flash('success', 'Payment processed.');
+  const payment = system.payments.makePayment(order.orderId, req.body.outcome);
+  if (payment.paymentStatus === 'Failed') {
+    req.flash('error', 'Payment failed. You can try again.');
+  } else {
+    req.flash('success', 'Payment processed.');
+  }
   res.redirect('/orders/' + order.orderId);
 });
 
-app.get('/payments', (req, res) => {
-  // Payment visibility follows ownership of the associated order.
-  requireRole(req, ['Admin', 'Seller', 'Customer']);
+app.get('/payments', signInRequired, (req, res) => {
   const keyword = String(req.query.keyword || '').toLowerCase();
-  const all = system.payments.getAll().filter(p => {
-    const o = system.orders.findById(p.orderId);
-    return o && (
-      req.user.role === 'Admin' ||
-      (req.user.role === 'Seller' ? o.sellerId : o.customerId) === req.user.userId
-    );
-  });
+  const all = system.payments.getAll().filter(payment =>
+    canViewOrder(req.user, system.orders.findById(payment.orderId))
+  );
   const results = all.filter(p =>
     (p.paymentId + ' ' + p.orderId + ' ' + p.paymentStatus)
       .toLowerCase()
@@ -468,14 +453,7 @@ app.get('/payments', (req, res) => {
 });
 
 app.get('/payments/:id/delete', (req, res) => {
-  requireRole(req, ['Admin', 'Customer']);
-  const payment = system.payments.getAll().find(
-    p => p.paymentId === Number(req.params.id)
-  );
-  if (!payment) {
-    throw new Error('Payment not found.');
-  }
-  orderAccess(req, payment.orderId);
+  const payment = paymentAccess(req);
   res.render('confirm', {
     title: 'Delete failed payment attempt',
     action: '/payments/' + payment.paymentId + '/delete',
@@ -485,14 +463,7 @@ app.get('/payments/:id/delete', (req, res) => {
 });
 
 app.post('/payments/:id/delete', (req, res) => {
-  requireRole(req, ['Admin', 'Customer']);
-  const payment = system.payments.getAll().find(
-    p => p.paymentId === Number(req.params.id)
-  );
-  if (!payment) {
-    throw new Error('Payment not found.');
-  }
-  orderAccess(req, payment.orderId);
+  const payment = paymentAccess(req);
   system.payments.delete(payment.paymentId);
   req.flash('success', 'Payment record deleted.');
   res.redirect('/payments');
@@ -501,6 +472,6 @@ app.post('/payments/:id/delete', (req, res) => {
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-app.listen(PORT, '127.0.0.1', () => {
-  console.log('OLMS running at http://localhost:' + PORT);
+const server = app.listen(PORT, '127.0.0.1', () => {
+  console.log('OLMS running at http://localhost:' + server.address().port);
 });

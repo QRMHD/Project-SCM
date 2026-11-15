@@ -1,10 +1,3 @@
-/**
- * middleware/errorHandler.js
- * Centralized error-handling classes and Express middleware for OLMS.
- */
-
-// ─── 1. Custom Error Classes ────────────────────────────────────────────────
-
 export class AppError extends Error {
   /**
    * @param {string} message - Human-readable error description
@@ -43,46 +36,23 @@ export class NotFoundError extends AppError {
   }
 }
 
-// ─── 2. Async Route Handler Wrapper ─────────────────────────────────────────
-
-/**
- * Wraps async route handlers to safely forward rejected promises to next(err).
- * Prevents unhandled promise rejections from terminating the process.
- *
- * @param {Function} fn - Async Express middleware/route handler
- */
-export const asyncHandler = (fn) => (req, res, next) => {
-  Promise.resolve(fn(req, res, next)).catch(next);
-};
-
-// ─── 3. 404 Not Found Middleware ────────────────────────────────────────────
-
-/**
- * Catch-all handler for requests that matched no route.
- * Dispatches a NotFoundError directly to the central errorHandler.
- */
 export function notFoundHandler(req, res, next) {
   next(new NotFoundError(`Page not found: ${req.method} ${req.originalUrl}`));
 }
 
-// ─── 4. Central Error Handler Middleware ─────────────────────────────────────
+export function errorHandler(err, req, res, next) {
+  if (res.headersSent) return next(err);
 
-/**
- * Central Express error handler (must have 4 arguments).
- * Formats error responses based on content type (JSON for API, EJS for web),
- * maps known library exceptions, logs diagnostics, and strips stack traces in production.
- */
-export function errorHandler(err, req, res, next) { // eslint-disable-line no-unused-vars
   const isProduction = process.env.NODE_ENV === 'production';
 
-  let statusCode = err.statusCode || 500;
+  let statusCode = err.statusCode || err.status || 500;
   let message = err.message || 'An unexpected error occurred.';
 
   // Map Zod validation errors (e.g. from schema validation)
   if (err.name === 'ZodError') {
     statusCode = 400;
     const issues = err.issues || err.errors || [];
-    message = issues[0]?.message || 'Validation failed.';
+    message = issues.length ? issues[0].message : 'Validation failed.';
   }
 
   // Map JSON body parser syntax errors
@@ -98,21 +68,24 @@ export function errorHandler(err, req, res, next) { // eslint-disable-line no-un
     console.error(err.stack);
   }
 
+  if (statusCode >= 500) message = 'An unexpected error occurred.';
+
   // Determine response format: JSON for /api or fetch/xhr requests, EJS for browser views
   const isApi = req.originalUrl.startsWith('/api') ||
     req.xhr ||
-    req.headers.accept?.includes('application/json');
+    (req.headers.accept || '').includes('application/json');
 
   if (isApi) {
     return res.status(statusCode).json({
       success: false,
-      error: message,
-      ...(isProduction ? {} : { stack: err.stack })
+      error: message
     });
   }
 
   // Render HTML error template for browser form submissions and page navigation
   return res.status(statusCode).render('error', {
+    user: req.user || null,
+    message: '',
     error: message
   });
 }

@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "node app.js",
-    "test": "node tests/integration.js && node tests/schemas.test.js",
+    "test": "node tests/integration.js && node --test tests/schemas.test.js tests/http.test.js",
     "test:integration": "node tests/integration.js",
     "test:schemas": "node tests/schemas.test.js"
   },
