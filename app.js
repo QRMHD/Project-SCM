@@ -34,7 +34,6 @@ app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(ROOT, 'public')));
 app.use(sanitiseBody);
 app.use(limitBodyFields());
-app.use('/api', createApiRouter(system));
 
 // Small local session implementation for the lab's login use case.
 app.use((req, res, next) => {
@@ -57,19 +56,25 @@ app.use((req, res, next) => {
 // Flash messages — must come after session middleware so req.sessionToken exists.
 app.use(flashMiddleware(sessions));
 
+// REST JSON API — mounted after session middleware so req.user is populated.
+app.use('/api', createApiRouter(system));
+
 function requireRole(req, roles) {
   if (!req.user || roles.indexOf(req.user.role) === -1) {
     throw new Error('Please sign in with an authorised account.');
   }
 }
 
-function startSession(res, user) {
+function startSession(res, user, req) {
   // Keep the user ID server-side; the cookie holds only a random token.
   const token = crypto.randomBytes(32).toString('hex');
   sessions.set(token, {
     userId: user.userId,
     expires: Date.now() + 8 * 60 * 60 * 1000
   });
+  if (req) {
+    req.sessionToken = token;
+  }
   res.setHeader(
     'Set-Cookie',
     'olms=' + token + '; HttpOnly; SameSite=Lax; Path=/; Max-Age=28800'
@@ -102,7 +107,7 @@ app.post('/login', validateLogin, (req, res) => {
     if (req.sessionToken) {
       sessions.delete(req.sessionToken);
     }
-    startSession(res, user);
+    startSession(res, user, req);
     req.flash('success', 'Welcome back, ' + user.name + '!');
     res.redirect('/products');
   } catch (error) {
@@ -250,7 +255,9 @@ Object.keys(forms).forEach(key => {
     res.render('list', {
       key, config, all, results,
       keyword: req.query.keyword || '',
-      message, error, displayValue
+      message: message || res.locals.message,
+      error: error || res.locals.error,
+      displayValue
     });
   };
 
