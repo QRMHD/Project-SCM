@@ -1,0 +1,4 @@
+<%- include('header') %><h1><%= config.title %></h1><form method="get" class="row"><input name="keyword" placeholder="Search by ID or text" value="<%= keyword %>"><button>Search</button><a class="button gray" href="/<%= key %>">Reset</a></form>
+<% if (user && (user.role === 'Admin' || (key === 'products' && user.role === 'Seller' && user.accountStatus === 'Approved'))) { %><p><a class="button" href="/<%= key %>/new">Add <%= config.single.toLowerCase() %></a></p><% } %>
+<% if (results !== null) { %><h2>Search results</h2><% if (!results.length) { %><p class="message error">Not found. Try another keyword.</p><% } else { %><%- include('recordTable', { records: results }) %><% } %><% } %>
+<h2>All <%= key %> (<%= all.length %>)</h2><%- include('recordTable', { records: all }) %><%- include('footer') %>

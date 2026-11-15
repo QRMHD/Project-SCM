@@ -1,53 +1,85 @@
 import { Product } from '../models/Product.js';
 
-// Holds all products and has the Create, Search, Edit, Delete and Display functions
 export class ProductManager {
-  constructor() {
-    this.products = [];
-    this.lastProductId = 0;
+
+  constructor(store) {
+    this.store = store;
   }
 
-  // 1. Create
-  createProduct(productName, price, stockQuantity, category) {
-    const product = new Product(this.lastProductId + 1, productName, price, stockQuantity, category);
-    this.lastProductId += 1;
-    this.products.push(product);
-    return product;
+  getAll() {
+    return this.store.data.products;
   }
 
-  // 2. Search: the keyword matches product name or category
-  searchProducts(keyword) {
-    const text = keyword.trim().toLowerCase();
-    return this.products.filter(
-      (p) => p.productName.toLowerCase().includes(text) || p.category.toLowerCase().includes(text)
-    );
+  findById(id) {
+    return this.getAll().find(p => p.productId === Number(id));
   }
 
-  findProductById(productId) {
-    return this.products.find((p) => p.productId === productId);
+  search(keyword) {
+    const text = String(keyword).toLowerCase();
+    return this.getAll().filter(p => {
+      const category = this.store.data.categories.find(
+        c => c.categoryId === p.categoryId
+      );
+      return (p.productId + ' ' + p.productName + ' ' + (category ? category.categoryName : ''))
+        .toLowerCase()
+        .includes(text);
+    });
   }
 
-  // 3. Edit: returns the edited product, or null if not found
-  editProduct(productId, productName, price, stockQuantity, category) {
-    const index = this.products.findIndex((p) => p.productId === productId);
-    if (index === -1) return null;
+  save(id, data) {
+    return this.store.transaction(() => {
+      const old = id ? this.findById(id) : null;
+      if (id && !old) {
+        throw new Error('Product not found.');
+      }
 
-    // A new Product checks all values first, so a bad value changes nothing
-    const editedProduct = new Product(productId, productName, price, stockQuantity, category);
-    this.products[index] = editedProduct;
-    return editedProduct;
+      const product = new Product(Object.assign({}, data, {
+        productId: old ? old.productId : this.store.nextId('product')
+      }));
+
+      if (!this.store.data.categories.some(c => c.categoryId === product.categoryId)) {
+        throw new Error('Category not found.');
+      }
+
+      if (!this.store.data.users.some(
+        u => u.userId === product.sellerId && u.role === 'Seller' && u.accountStatus === 'Approved'
+      )) {
+        throw new Error('Choose an approved seller.');
+      }
+
+      if (old && old.sellerId !== product.sellerId
+        && (this.store.data.orders.some(o => o.items.some(i => i.productId === old.productId))
+          || this.store.data.carts.some(c => c.items.some(i => i.productId === old.productId)))
+      ) {
+        throw new Error('Cannot reassign a product used in a cart or order.');
+      }
+
+      if (old) {
+        this.getAll()[this.getAll().indexOf(old)] = product;
+      } else {
+        this.getAll().push(product);
+      }
+
+      return product;
+    });
   }
 
-  // 4. Delete: returns true if deleted, false if not found
-  deleteProduct(productId) {
-    const index = this.products.findIndex((p) => p.productId === productId);
-    if (index === -1) return false;
-    this.products.splice(index, 1);
-    return true;
+  delete(id) {
+    // Preserve products referenced by carts or historical orders.
+    return this.store.transaction(() => {
+      const product = this.findById(id);
+      if (!product) {
+        throw new Error('Product not found.');
+      }
+
+      if (this.store.data.carts.some(c => c.items.some(i => i.productId === product.productId))
+        || this.store.data.orders.some(o => o.items.some(i => i.productId === product.productId))
+      ) {
+        throw new Error('Product is linked to a cart or order.');
+      }
+
+      this.getAll().splice(this.getAll().indexOf(product), 1);
+    });
   }
 
-  // 5. Display: get all products
-  getAllProducts() {
-    return this.products;
-  }
 }

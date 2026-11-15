@@ -1,0 +1,94 @@
+{
+  "users": [
+    {
+      "userId": 1,
+      "name": "OLMS Admin",
+      "email": "admin@olms.test",
+      "passwordHash": "8e3e70c1de79962c4bf42a07eed476cb:0e8ef17c65061af57643297a7d63d2f9c44c7af43d57f28bdfe81234f1459e13",
+      "role": "Admin"
+    },
+    {
+      "userId": 2,
+      "name": "Kajang Local Mart",
+      "email": "seller@olms.test",
+      "passwordHash": "16799a668a2652999e409d18f8896e74:e0f1a96ce6b01cca607c97d72fd9ab0d04f93f26a29eff753d5c8b9be2d1859b",
+      "role": "Seller",
+      "accountStatus": "Approved"
+    },
+    {
+      "userId": 3,
+      "name": "Aisha Rahman",
+      "email": "customer@olms.test",
+      "passwordHash": "6b84d904787fdfe19eb648b41a9d3f38:269e0ada88f3259e95c46f00096e218c6b4f948a243affde8c11d601873766e9",
+      "role": "Customer",
+      "phone": "0123456789",
+      "address": "12 Jalan Mawar, Kajang"
+    },
+    {
+      "userId": 4,
+      "name": "Daniel Lee",
+      "email": "daniel@olms.test",
+      "passwordHash": "c12ba1f1d24e681533225bac1bc60abb:fec643f7ca327aeceac2623cac400a09b4712bf35959755ce6c06730ada16e9e",
+      "role": "Customer",
+      "phone": "0198765432",
+      "address": "8 Lorong Cempaka, Putrajaya"
+    },
+    {
+      "userId": 5,
+      "name": "AHMED Ali",
+      "email": "ahmedymas2006@gmail.com",
+      "passwordHash": "642cd346ea28dda90d3679dab21b25a6:f9694a4ad65357ac79b73b92f24ee16b6f25351ba7446a06db538a257d13ad7a",
+      "role": "Customer",
+      "phone": "01160940350",
+      "address": "kajang"
+    }
+  ],
+  "products": [
+    {
+      "productId": 1,
+      "productName": "Fresh Milk 1L",
+      "price": 6.5,
+      "stockQuantity": 40,
+      "categoryId": 1,
+      "sellerId": 2
+    },
+    {
+      "productId": 2,
+      "productName": "Basmati Rice 5kg",
+      "price": 24.9,
+      "stockQuantity": 15,
+      "categoryId": 2,
+      "sellerId": 2
+    },
+    {
+      "productId": 3,
+      "productName": "Dish Soap",
+      "price": 4.2,
+      "stockQuantity": 30,
+      "categoryId": 3,
+      "sellerId": 2
+    }
+  ],
+  "categories": [
+    {
+      "categoryId": 1,
+      "categoryName": "Drinks"
+    },
+    {
+      "categoryId": 2,
+      "categoryName": "Groceries"
+    },
+    {
+      "categoryId": 3,
+      "categoryName": "Household"
+    }
+  ],
+  "carts": [],
+  "orders": [],
+  "payments": [],
+  "counters": {
+    "user": 5,
+    "category": 3,
+    "product": 3
+  }
+}
