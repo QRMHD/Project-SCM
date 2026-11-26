@@ -13,7 +13,15 @@ import {
   validatePayment,
   validateOrderStatus
 } from './middleware/defensive.js';
-import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
+import {
+  AppError,
+  BadRequestError,
+  UnauthorizedError,
+  ForbiddenError,
+  NotFoundError,
+  notFoundHandler,
+  errorHandler
+} from './middleware/errorHandler.js';
 import { createApiRouter } from './middleware/api.js';
 import { flashMiddleware } from './middleware/flash.js';
 
@@ -60,8 +68,33 @@ app.use(flashMiddleware(sessions));
 app.use('/api', createApiRouter(system));
 
 function requireRole(req, roles) {
-  if (!req.user || roles.indexOf(req.user.role) === -1) {
-    throw new Error('Please sign in with an authorised account.');
+  if (!req.user) {
+    throw new UnauthorizedError('Please sign in with an authorised account.');
+  }
+  if (roles.indexOf(req.user.role) === -1) {
+    throw new ForbiddenError('Please sign in with an authorised account.');
+  }
+}
+
+/**
+ * Wraps synchronous manager operations so expected domain validation errors
+ * are classified as operational 400 BadRequestErrors rather than 500s.
+ */
+function runDomain(fn) {
+  try {
+    return fn();
+  } catch (err) {
+    if (
+      err instanceof AppError ||
+      err instanceof TypeError ||
+      err instanceof ReferenceError ||
+      err instanceof SyntaxError ||
+      err instanceof RangeError ||
+      err.code
+    ) {
+      throw err;
+    }
+    throw new BadRequestError(err.message);
   }
 }
 
@@ -91,7 +124,7 @@ function orderAccess(req, id) {
     (req.user.role === 'Customer' && order.customerId !== req.user.userId) ||
     (req.user.role === 'Seller' && order.sellerId !== req.user.userId)
   ) {
-    throw new Error('Order not found.');
+    throw new NotFoundError('Order not found.');
   }
 
   return order;
@@ -359,11 +392,13 @@ app.get('/cart', (req, res) => {
 
 app.post('/cart/items', validateCartItem, (req, res) => {
   requireRole(req, ['Customer']);
-  system.carts.setItem(
-    req.user.userId,
-    req.body.productId,
-    req.body.quantity,
-    req.body.operation === 'add'
+  runDomain(() =>
+    system.carts.setItem(
+      req.user.userId,
+      req.body.productId,
+      req.body.quantity,
+      req.body.operation === 'add'
+    )
   );
   req.flash('success', 'Cart updated.');
   res.redirect('/cart');
@@ -386,9 +421,11 @@ app.post('/cart/clear', (req, res) => {
   res.redirect('/cart');
 });
 
+app.get('/checkout', (req, res) => res.redirect('/cart'));
+
 app.post('/checkout', (req, res) => {
   requireRole(req, ['Customer']);
-  const order = system.orders.checkout(req.user.userId);
+  const order = runDomain(() => system.orders.checkout(req.user.userId));
   req.flash('success', 'Order #' + order.orderId + ' placed successfully!');
   res.redirect('/orders/' + order.orderId);
 });
@@ -419,9 +456,9 @@ app.get('/orders/:id', (req, res) => {
 app.post('/orders/:id/status', validateOrderStatus, (req, res) => {
   const order = orderAccess(req, req.params.id);
   if (req.user.role === 'Customer' && req.body.orderStatus !== 'Cancelled') {
-    throw new Error('Customers may only cancel pending orders.');
+    throw new BadRequestError('Customers may only cancel pending orders.');
   }
-  system.orders.updateStatus(order.orderId, req.body.orderStatus);
+  runDomain(() => system.orders.updateStatus(order.orderId, req.body.orderStatus));
   req.flash('success', 'Order status updated to ' + req.body.orderStatus + '.');
   res.redirect('/orders/' + order.orderId);
 });
@@ -442,7 +479,7 @@ app.get('/orders/:id/delete', (req, res) => {
 app.post('/orders/:id/delete', (req, res) => {
   const order = orderAccess(req, req.params.id);
   requireRole(req, ['Admin', 'Customer']);
-  system.orders.delete(order.orderId);
+  runDomain(() => system.orders.delete(order.orderId));
   req.flash('success', 'Order deleted.');
   res.redirect('/orders');
 });
@@ -450,7 +487,7 @@ app.post('/orders/:id/delete', (req, res) => {
 app.post('/orders/:id/pay', validatePayment, (req, res) => {
   const order = orderAccess(req, req.params.id);
   requireRole(req, ['Customer']);
-  system.payments.makePayment(order.orderId, req.body.outcome);
+  runDomain(() => system.payments.makePayment(order.orderId, req.body.outcome));
   req.flash('success', 'Payment processed.');
   res.redirect('/orders/' + order.orderId);
 });
@@ -480,7 +517,7 @@ app.get('/payments/:id/delete', (req, res) => {
     p => p.paymentId === Number(req.params.id)
   );
   if (!payment) {
-    throw new Error('Payment not found.');
+    throw new NotFoundError('Payment not found.');
   }
   orderAccess(req, payment.orderId);
   res.render('confirm', {
@@ -497,10 +534,10 @@ app.post('/payments/:id/delete', (req, res) => {
     p => p.paymentId === Number(req.params.id)
   );
   if (!payment) {
-    throw new Error('Payment not found.');
+    throw new NotFoundError('Payment not found.');
   }
   orderAccess(req, payment.orderId);
-  system.payments.delete(payment.paymentId);
+  runDomain(() => system.payments.delete(payment.paymentId));
   req.flash('success', 'Payment record deleted.');
   res.redirect('/payments');
 });
@@ -508,6 +545,10 @@ app.post('/payments/:id/delete', (req, res) => {
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-app.listen(PORT, '127.0.0.1', () => {
-  console.log('OLMS running at http://localhost:' + PORT);
-});
+if (process.env.OLMS_NO_LISTEN !== '1') {
+  app.listen(PORT, '127.0.0.1', () => {
+    console.log('OLMS running at http://localhost:' + PORT);
+  });
+}
+
+export { app };

@@ -4,9 +4,11 @@
   "type": "module",
   "scripts": {
     "start": "node app.js",
-    "test": "node tests/integration.js && node tests/schemas.test.js",
+    "test": "node tests/unit.test.js && node tests/schemas.test.js && node tests/integration.js && node tests/system.test.js",
+    "test:unit": "node tests/unit.test.js",
+    "test:schemas": "node tests/schemas.test.js",
     "test:integration": "node tests/integration.js",
-    "test:schemas": "node tests/schemas.test.js"
+    "test:system": "node tests/system.test.js"
   },
   "dependencies": {
     "ejs": "^3.1.10",
