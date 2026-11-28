@@ -24,6 +24,7 @@ import {
 } from './middleware/errorHandler.js';
 import { createApiRouter } from './middleware/api.js';
 import { flashMiddleware } from './middleware/flash.js';
+import { positiveIdSchema } from './models/schemas.js';
 
 const ROOT = path.resolve(process.env.OLMS_APP_ROOT || '.');
 const PORT = Number(process.env.PORT || 3000);
@@ -162,14 +163,14 @@ app.get('/register', (req, res) => res.render('register', { formData: {} }));
 
 app.post('/register', validateRegister, (req, res) => {
   try {
-    if (['Customer', 'Seller'].indexOf(req.body.role) === -1) {
-      throw new Error('Select Customer or Seller.');
-    }
     const data = Object.assign({}, req.body, { accountStatus: 'Pending' });
-    system.users.create(req.body.role, data);
-    req.flash('success', 'Account created. Sellers need administrator approval before adding products.');
-    res.redirect('/login');
+    runDomain(() => system.users.create(req.body.role, data));
+    const message = req.body.role === 'Seller'
+      ? 'Account created. Administrator approval is required before adding products.'
+      : 'Account created. You can now log in.';
+    res.status(201).render('login', { message });
   } catch (error) {
+    if (!(error instanceof BadRequestError)) throw error;
     res.status(400).render('register', {
       error: error.message,
       formData: req.body
@@ -237,7 +238,7 @@ function canManage(req, key, record) {
     (req.user.accountStatus !== 'Approved' ||
       (record && record.sellerId !== req.user.userId))
   ) {
-    throw new Error(
+    throw new ForbiddenError(
       'You can only manage your own products after approval.'
     );
   }
@@ -296,6 +297,21 @@ Object.keys(forms).forEach(key => {
 
   app.get('/' + key, (req, res) => list(req, res));
 
+  function findManagedRecord(req) {
+    canManage(req, key);
+    const id = positiveIdSchema.safeParse(req.params.id);
+    if (!id.success) {
+      throw new BadRequestError('Invalid ID parameter.');
+    }
+    const record = manager.findById(id.data);
+    if (record) canManage(req, key, record);
+    return record;
+  }
+
+  function showMissingRecord(req, res) {
+    return list(req, res.status(404), '', config.single + ' not found.');
+  }
+
   app.get('/' + key + '/new', (req, res) => {
     canManage(req, key);
     res.render('form', {
@@ -307,10 +323,9 @@ Object.keys(forms).forEach(key => {
   });
 
   app.get('/' + key + '/:id/edit', (req, res) => {
-    const record = manager.findById(req.params.id);
-    canManage(req, key, record);
+    const record = findManagedRecord(req);
     if (!record) {
-      return list(req, res, '', config.single + ' not found.');
+      return showMissingRecord(req, res);
     }
     res.render('form', {
       key, config,
@@ -321,7 +336,6 @@ Object.keys(forms).forEach(key => {
   });
 
   const save = (req, res, id) => {
-    canManage(req, key, id ? manager.findById(id) : null);
     try {
       const data = {};
       // Accept configured fields only; sellers cannot submit another seller ID.
@@ -331,10 +345,10 @@ Object.keys(forms).forEach(key => {
       if (key === 'products' && req.user.role === 'Seller') {
         data.sellerId = req.user.userId;
       }
-      manager.save(id, data);
-      list(req, res, config.single + (id ? ' was updated.' : ' was added.'));
+      runDomain(() => manager.save(id, data));
     } catch (error) {
-      res.status(400).render('form', {
+      if (!(error instanceof BadRequestError)) throw error;
+      return res.status(400).render('form', {
         key, config,
         formData: req.body,
         options: optionsFor(req),
@@ -342,19 +356,26 @@ Object.keys(forms).forEach(key => {
         error: error.message
       });
     }
+    return list(req, res, config.single + (id === null ? ' was added.' : ' was updated.'));
   };
 
-  app.post('/' + key, (req, res) => save(req, res, null));
+  app.post('/' + key, (req, res) => {
+    canManage(req, key);
+    return save(req, res, null);
+  });
 
   app.post('/' + key + '/:id/edit', (req, res) => {
-    save(req, res, Number(req.params.id));
+    const record = findManagedRecord(req);
+    if (!record) {
+      return showMissingRecord(req, res);
+    }
+    return save(req, res, record[config.id]);
   });
 
   app.get('/' + key + '/:id/delete', (req, res) => {
-    const record = manager.findById(req.params.id);
-    canManage(req, key, record);
+    const record = findManagedRecord(req);
     if (!record) {
-      return list(req, res, '', config.single + ' not found.');
+      return showMissingRecord(req, res);
     }
     res.render('confirm', {
       title: 'Delete ' + config.single,
@@ -367,16 +388,21 @@ Object.keys(forms).forEach(key => {
   });
 
   app.post('/' + key + '/:id/delete', (req, res) => {
-    canManage(req, key, manager.findById(req.params.id));
-    try {
-      if (config.id === 'userId' && Number(req.params.id) === req.user.userId) {
-        throw new Error('You cannot delete your signed-in account here.');
-      }
-      manager.delete(req.params.id);
-      list(req, res, config.single + ' was deleted.');
-    } catch (error) {
-      list(req, res, '', error.message);
+    const record = findManagedRecord(req);
+    if (!record) {
+      return showMissingRecord(req, res);
     }
+    const id = record[config.id];
+    try {
+      if (config.id === 'userId' && id === req.user.userId) {
+        throw new BadRequestError('You cannot delete your signed-in account here.');
+      }
+      runDomain(() => manager.delete(id));
+    } catch (error) {
+      if (!(error instanceof BadRequestError)) throw error;
+      return list(req, res.status(400), '', error.message);
+    }
+    return list(req, res, config.single + ' was deleted.');
   });
 });
 
@@ -487,8 +513,14 @@ app.post('/orders/:id/delete', (req, res) => {
 app.post('/orders/:id/pay', validatePayment, (req, res) => {
   const order = orderAccess(req, req.params.id);
   requireRole(req, ['Customer']);
-  runDomain(() => system.payments.makePayment(order.orderId, req.body.outcome));
-  req.flash('success', 'Payment processed.');
+  const payment = runDomain(() =>
+    system.payments.makePayment(order.orderId, req.body.outcome)
+  );
+  if (payment.paymentStatus === 'Success') {
+    req.flash('success', 'Payment successful.');
+  } else {
+    req.flash('error', 'Payment failed. Your order is still pending. You can try again.');
+  }
   res.redirect('/orders/' + order.orderId);
 });
 

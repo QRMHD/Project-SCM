@@ -105,6 +105,18 @@ try {
     assert(res.text.includes('Page not found'));
   });
 
+  await systemTest('Guest registration shows confirmation without starting a session', async () => {
+    const res = await postForm('/register', {
+      role: 'Seller',
+      name: 'Test Seller',
+      email: 'new-seller@example.test',
+      password: 'TestPassword123!'
+    });
+    assert.strictEqual(res.status, 201);
+    assert.strictEqual(res.headers['set-cookie'], undefined);
+    assert.match(res.text, /Account created\. Administrator approval is required/);
+  });
+
   // ── 2. Integrated REST API Security & Error Handling ──────────────────────
 
   await systemTest('API returns sanitized products and rejects malformed IDs / unauthorized access', async () => {
@@ -146,6 +158,22 @@ try {
     });
   });
 
+  await systemTest('Product edit and delete report missing records without changing saved data', async () => {
+    const loginRes = await postForm('/login', {
+      email: 'admin@olms.test',
+      password: 'Admin123!'
+    });
+    assert.strictEqual(loginRes.status, 302);
+    const adminCookie = loginRes.headers['set-cookie'][0].split(';')[0];
+    const before = fs.readFileSync(process.env.OLMS_DATA_FILE, 'utf8');
+    for (const action of ['edit', 'delete']) {
+      const res = await postForm('/products/9999/' + action, {}, adminCookie);
+      assert.strictEqual(res.status, 404);
+      assert.match(res.text, /Product not found\./);
+    }
+    assert.strictEqual(fs.readFileSync(process.env.OLMS_DATA_FILE, 'utf8'), before);
+  });
+
   // ── 3. Full Customer Workflow: Login -> Flash -> Cart -> Checkout -> Pay ──
 
   await systemTest('Customer login, flash banner, cart, checkout, payment, and transition guard', async () => {
@@ -184,6 +212,18 @@ try {
       operation: 'add'
     }, customerCookie);
     assert.strictEqual(addCartRes.status, 302);
+    assert.strictEqual(addCartRes.headers.location, '/cart');
+
+    const cartPage = await request('GET', '/cart', {
+      headers: { Cookie: customerCookie }
+    });
+    assert.strictEqual(cartPage.status, 200);
+    assert.match(cartPage.text, /Cart updated\./);
+    const refreshedCart = await request('GET', '/cart', {
+      headers: { Cookie: customerCookie }
+    });
+    assert.strictEqual(refreshedCart.status, 200);
+    assert.doesNotMatch(refreshedCart.text, /Cart updated\./);
 
     const checkoutRes = await postForm('/checkout', {}, customerCookie);
     assert.strictEqual(checkoutRes.status, 302);
@@ -196,7 +236,19 @@ try {
     assert.strictEqual(illegalStatusRes.status, 400);
     assert(illegalStatusRes.text.includes('Customers may only cancel pending orders.'));
 
-    // Successful simulated payment updates order to Paid.
+    // A failed payment keeps the order Pending so the customer can retry.
+    const failedPay = await postForm('/orders/1/pay', {
+      outcome: 'Failed'
+    }, customerCookie);
+    assert.strictEqual(failedPay.status, 302);
+    assert.strictEqual(failedPay.headers.location, '/orders/1');
+    const pendingOrderRes = await request('GET', '/orders/1', {
+      headers: { Cookie: customerCookie }
+    });
+    assert.match(pendingOrderRes.text, /Payment failed\. Your order is still pending\./);
+    assert.match(pendingOrderRes.text, /Status: <strong>Pending<\/strong>/);
+
+    // A successful retry updates the order to Paid.
     const payRes = await postForm('/orders/1/pay', {
       outcome: 'Success'
     }, customerCookie);
@@ -206,6 +258,7 @@ try {
       headers: { Cookie: customerCookie }
     });
     assert(paidOrderRes.text.includes('Status: <strong>Paid</strong>'));
+    assert.match(paidOrderRes.text, /Payment successful\./);
   });
 
   console.log(`\nAll ${passed} end-to-end system test scenarios passed successfully!`);

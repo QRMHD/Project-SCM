@@ -10,7 +10,7 @@ The **Online Local Mart System (OLMS)** is a web-based e-commerce platform desig
 - **Account Management:** Register a new account, log in, and update profile details.
 - **Catalog Navigation:** Browse available products and search for specific items.
 - **Cart & Ordering:** Add products to the cart, review cart details, and place orders.
-- **Payment Processing:** Make payments via an integrated third-party payment gateway.
+- **Payment Simulation:** Run a local success or failure simulation. No external payment service is contacted.
 
 ### 🏪 Seller
 - **Authentication:** Account registration and secure login.
@@ -23,7 +23,7 @@ The **Online Local Mart System (OLMS)** is a web-based e-commerce platform desig
 - **System Monitoring:** View the complete catalog of product listings and inspect all system orders.
 
 ### 💳 Payment Gateway
-- **Transaction Handling:** Securely processes payment authorization and returns status outcomes to complete or fail orders.
+- **Transaction Handling:** Records a simulated payment attempt and updates the order only when the attempt succeeds.
 
 ---
 
@@ -36,10 +36,14 @@ The **Online Local Mart System (OLMS)** is a web-based e-commerce platform desig
 ### Order Workflow
 1. **Authentication:** User logs in or registers an account.
 2. **Product Selection:** User searches or browses products, views details, and adds items to the cart.
-3. **Cart Review & Checkout:** User reviews the cart and proceeds to order placement.
-4. **Payment:** Payment is submitted to the gateway.
-   - **On Success:** System creates the order, deducts product stock, and displays an order confirmation.
-   - **On Failure:** System displays a payment failed notification.
+3. **Cart Review & Checkout:** The system reserves stock and creates a pending order.
+4. **Payment:** The customer runs a local payment simulation.
+   - **On Success:** The order becomes Paid.
+   - **On Failure:** The system records the failed attempt, keeps the order Pending, and allows a retry.
+
+## Run and Test
+
+From the project folder, run `npm ci`, then `npm test` to run the unit, schema, integration, and HTTP system tests. Run `npm start` and open http://localhost:3000 to use the app. If there is no saved data file, the app creates demo data on startup.
 
 ---
 
@@ -87,7 +91,7 @@ The **Online Local Mart System (OLMS)** is a web-based e-commerce platform desig
 ## Team Information
 
 **Institution:** Universiti Tenaga Nasional (Putrajaya Campus)  
-**Course:** CSEB5213 – Software Construction & Methods  
+**Course:** CSEB5223 – Software Construction & Methods
 **Semester:** Semester 1 2026/2027  
 **Lab Group:** Group 5 (Class 01B)  
 
